@@ -2,8 +2,7 @@
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { LiquidButton } from "@/components/ui/liquid-glass-button";
-import { Wallet, ChevronDown, Copy, ExternalLink, LogOut } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { Wallet, ChevronDown } from "lucide-react";
 
 export function ConnectWalletButton() {
   return (
@@ -35,11 +34,11 @@ export function ConnectWalletButton() {
                 return (
                   <LiquidButton
                     onClick={openConnectModal}
-                    size="default"
-                    className="text-sm"
+                    size="sm"
+                    className="text-xs h-8 px-3 rounded-lg"
                   >
-                    <Wallet className="h-4 w-4 mr-1.5" />
-                    Connect Wallet
+                    <Wallet className="h-3.5 w-3.5 mr-1" />
+                    Connect
                   </LiquidButton>
                 );
               }
@@ -48,8 +47,8 @@ export function ConnectWalletButton() {
                 return (
                   <LiquidButton
                     onClick={openChainModal}
-                    size="default"
-                    className="text-sm text-red-400"
+                    size="sm"
+                    className="text-xs h-8 px-3 rounded-lg text-red-400"
                   >
                     Wrong Network
                   </LiquidButton>
@@ -57,10 +56,10 @@ export function ConnectWalletButton() {
               }
 
               return (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <button
                     onClick={openChainModal}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10 text-xs text-muted-foreground hover:text-foreground hover:bg-muted dark:hover:bg-white/10 transition-colors cursor-pointer"
+                    className="flex items-center justify-center h-8 w-8 rounded-lg bg-muted/50 dark:bg-white/5 border border-border dark:border-white/10 hover:bg-muted dark:hover:bg-white/10 transition-colors cursor-pointer"
                   >
                     {chain.hasIcon && chain.iconUrl && (
                       <img
@@ -73,13 +72,13 @@ export function ConnectWalletButton() {
 
                   <LiquidButton
                     onClick={openAccountModal}
-                    size="default"
-                    className="text-sm"
+                    size="sm"
+                    className="text-xs h-8 px-3 rounded-lg"
                   >
-                    <span className="font-mono text-xs">
+                    <span className="font-mono text-[11px]">
                       {account.displayName}
                     </span>
-                    <ChevronDown className="h-3 w-3 ml-0.5 opacity-50" />
+                    <ChevronDown className="h-3 w-3 ml-0.5 opacity-40" />
                   </LiquidButton>
                 </div>
               );
