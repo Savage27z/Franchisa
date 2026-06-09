@@ -4,7 +4,7 @@ import { BarChart3, Shield, User, ChevronLeft, Droplets } from "lucide-react";
 import Link from "next/link";
 import { NavBar } from "@/components/ui/tubelight-navbar";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { ConnectWalletButton } from "@/components/connect-wallet-button";
 
 const navItems = [
   { name: "Dashboard", url: "/dashboard", icon: BarChart3 },
@@ -29,11 +29,7 @@ export function Navbar() {
         </div>
         <div className="flex items-center gap-2 mt-0.5">
           <ThemeToggle />
-          <ConnectButton
-            chainStatus="icon"
-            accountStatus="address"
-            showBalance={false}
-          />
+          <ConnectWalletButton />
         </div>
       </div>
     </header>
