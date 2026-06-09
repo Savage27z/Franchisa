@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Loader2,
   ExternalLink,
+  Wallet,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,13 +108,11 @@ export function ProposalCard({
   }, [voteSuccess, refetchResults]);
 
   const handleVote = async (choice: "yes" | "no" | "abstain") => {
-    if (!isOnChain || !ticker || !isConnected) {
-      // Fallback to mock voting
-      setLocalVote(choice);
-      return;
-    }
+    // Require wallet connection — voting always requires a signed transaction
+    if (!isConnected) return;
+    if (!ticker) return;
 
-    // Real on-chain vote: 0=No, 1=Yes, 2=Abstain
+    // On-chain vote: 0=No, 1=Yes, 2=Abstain — triggers MetaMask signature
     const choiceMap = { yes: 1, no: 0, abstain: 2 };
     submitVote(ticker, proposal.proposalId, choiceMap[choice]);
     setLocalVote(choice);
@@ -268,13 +267,14 @@ export function ProposalCard({
                       </span>
                     </span>
                   </div>
-                ) : !isConnected && isOnChain ? (
+                ) : !isConnected ? (
                   <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/50 dark:bg-white/5">
+                    <Wallet className="h-4 w-4 text-muted-foreground/50 shrink-0" />
                     <span className="text-sm text-muted-foreground">
-                      Connect wallet to vote on-chain
+                      Connect your wallet to vote — each vote requires a signed transaction
                     </span>
                   </div>
-                ) : isOnChain && (!balance || balance === 0n) ? (
+                ) : !balance || balance === 0n ? (
                   <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10">
                     <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                     <span className="text-xs text-amber-400">
