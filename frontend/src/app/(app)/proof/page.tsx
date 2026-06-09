@@ -2,47 +2,70 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Copy, Download, CheckCircle2 } from "lucide-react";
+import { Copy, Download, CheckCircle2, Shield, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MOCK_MEETINGS, getVotePercentage } from "@/lib/mock-data";
+import { CONTRACT_ADDRESSES } from "@/lib/contracts";
 
 const sampleProof = {
   franchisa_governance_proof: {
-    version: "1.0.0",
+    version: "1.0",
+    type: "franchisa-governance-proof",
     generatedAt: new Date().toISOString(),
-    network: "arbitrum-sepolia",
-    chainId: 421614,
-    contracts: {
-      registry: "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18",
-      stylusEngine: "0x8Ba1f109551bD432803012645Ac136ddd64DBA72",
+    chain: {
+      network: "arbitrum-sepolia",
+      chainId: 421614,
+      registryContract: CONTRACT_ADDRESSES.registry,
+      stylusEngine: CONTRACT_ADDRESSES.stylusEngine,
+      tokenContract: CONTRACT_ADDRESSES.mockToken,
     },
     meeting: {
       ticker: "TSLA",
       companyName: "Tesla, Inc.",
-      meetingDate: "2026-08-15",
-      totalVoters: 1247,
+      meetingDate: "2026-07-18T00:00:00Z",
+      source: "SEC EDGAR DEF 14A",
     },
-    results: MOCK_MEETINGS[0].proposals.map((p) => {
-      const { yesPercent, noPercent, abstainPercent } = getVotePercentage(
-        p.yesWeight,
-        p.noWeight,
-        p.abstainWeight
-      );
-      return {
-        proposalId: p.proposalId,
-        title: p.title,
-        yesWeight: p.yesWeight.toString(),
-        noWeight: p.noWeight.toString(),
-        abstainWeight: p.abstainWeight.toString(),
-        yesPercentage: `${yesPercent.toFixed(2)}%`,
-        noPercentage: `${noPercent.toFixed(2)}%`,
-        abstainPercentage: `${abstainPercent.toFixed(2)}%`,
-        voterCount: p.voterCount,
-      };
-    }),
-    signature:
-      "0x4a7b3c8d9e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a",
+    proposal: {
+      id: 1,
+      title: "Election of Board of Directors",
+      category: "Board Election",
+    },
+    vote: {
+      voter: "0x... (your address)",
+      choice: 1,
+      choiceLabel: "FOR",
+      weight: "1000000000000000000000",
+      weightFormatted: "1,000 mTSLA",
+      txHash: "0x... (transaction hash)",
+      blockNumber: "...",
+    },
+    agentTrace: {
+      steps: [
+        "OBSERVE",
+        "DECIDE",
+        "PARSE",
+        "VALIDATE",
+        "SUBMIT",
+        "VERIFY",
+        "PROVE",
+      ],
+      observeSource: "SEC EDGAR API",
+      parseModel: "claude-sonnet-4-20250514",
+      validateChecks: [
+        "ticker_match",
+        "proposal_count",
+        "date_valid",
+        "token_balance > 0",
+      ],
+    },
+    signature: {
+      algorithm: "ECDSA-secp256k1",
+      signer: "0xD78D1D5Dd356DECc696192D68b2cd046266D3046",
+      message: "keccak256(canonical_proof_body)",
+      v: 28,
+      r: "0x...",
+      s: "0x...",
+    },
   },
 };
 
@@ -54,6 +77,16 @@ export default function ProofPage() {
     await navigator.clipboard.writeText(jsonString);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "franchisa_proof_TSLA_sample.json";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -74,6 +107,51 @@ export default function ProofPage() {
         </p>
       </motion.div>
 
+      {/* How it works */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.05 }}
+        className="rounded-2xl border border-border dark:border-white/10 bg-card/80 dark:bg-white/[0.03] p-6 mb-6"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Shield className="h-4 w-4 text-primary" />
+          <p className="text-sm font-medium text-foreground/80">
+            How Governance Proofs Work
+          </p>
+        </div>
+        <div className="space-y-3 text-sm text-muted-foreground">
+          <p>
+            After votes are cast on-chain, the AI agent generates a signed proof
+            that attests the entire pipeline — from SEC filing to on-chain vote
+            to final result.
+          </p>
+          <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 dark:bg-white/[0.02] border border-border/50 dark:border-white/5">
+            <Terminal className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground/60" />
+            <div className="font-mono text-xs space-y-1">
+              <p className="text-foreground/70">
+                # Generate a real proof via the CLI agent
+              </p>
+              <p>
+                python agent.py proof --ticker TSLA
+              </p>
+              <p className="text-foreground/70 mt-2">
+                # Verify a proof file
+              </p>
+              <p>
+                python agent.py verify franchisa_proof_TSLA.json
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground/60">
+            The proof below is a sample schema. Real proofs are generated by the
+            agent CLI with actual ECDSA signatures and on-chain transaction
+            hashes.
+          </p>
+        </div>
+      </motion.div>
+
+      {/* Proof JSON */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -83,10 +161,10 @@ export default function ProofPage() {
         <div className="flex items-center justify-between px-5 py-3 border-b border-border dark:border-white/10">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium font-mono text-foreground/70">
-              franchisa_proof_TSLA.json
+              franchisa_proof_TSLA_sample.json
             </span>
-            <Badge className="text-[10px] rounded-full bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10">
-              Verified
+            <Badge className="text-[10px] rounded-full bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/10">
+              Sample Schema
             </Badge>
           </div>
           <div className="flex items-center gap-1">
@@ -111,6 +189,7 @@ export default function ProofPage() {
             <Button
               size="sm"
               variant="ghost"
+              onClick={handleDownload}
               className="text-xs h-7 cursor-pointer text-muted-foreground hover:text-foreground"
             >
               <Download className="h-3 w-3 mr-1" />
@@ -129,9 +208,17 @@ export default function ProofPage() {
         transition={{ duration: 0.3, delay: 0.2 }}
         className="text-xs text-muted-foreground/50 leading-relaxed"
       >
-        Cryptographic governance proofs are generated from on-chain state.
-        Custodian integration (Robinhood, DTCC) is a partnership layer built
-        on top of this verifiable data.
+        See{" "}
+        <a
+          href="https://github.com/Savage27z/Franchisa/blob/main/PROOF_SPEC.md"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary/60 hover:text-primary transition-colors"
+        >
+          PROOF_SPEC.md
+        </a>{" "}
+        for the full v1 specification including ECDSA signature construction,
+        verification flow, and agent trace format.
       </motion.p>
     </div>
   );
