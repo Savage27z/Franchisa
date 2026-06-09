@@ -71,17 +71,12 @@ export function ProposalCard({
     refetch: refetchResults,
   } = useVoteResults(ticker ?? "", proposal.proposalId);
 
-  // Use on-chain results if available and non-zero, else mock data
-  const hasOnChainResults =
-    isOnChain && (onChainYes > 0n || onChainNo > 0n || onChainAbstain > 0n);
+  // Always use on-chain results — show real zeros when no votes cast yet
+  const yesWeight = isOnChain ? onChainYes : proposal.yesWeight;
+  const noWeight = isOnChain ? onChainNo : proposal.noWeight;
+  const abstainWeight = isOnChain ? onChainAbstain : proposal.abstainWeight;
 
-  const yesWeight = hasOnChainResults ? onChainYes : proposal.yesWeight;
-  const noWeight = hasOnChainResults ? onChainNo : proposal.noWeight;
-  const abstainWeight = hasOnChainResults
-    ? onChainAbstain
-    : proposal.abstainWeight;
-
-  const { yesPercent, noPercent, abstainPercent } = hasOnChainResults
+  const { yesPercent, noPercent, abstainPercent } = isOnChain
     ? {
         yesPercent: onChainYesPercent,
         noPercent: onChainNoPercent,

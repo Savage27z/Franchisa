@@ -24,20 +24,25 @@ export function StatsBar() {
     query: { enabled: isDeployed },
   });
 
-  const activeMeetings = onChainCount
-    ? Number(onChainCount)
-    : MOCK_MEETINGS.filter((m) => m.isActive).length;
-
+  const activeMeetings = onChainCount ? Number(onChainCount) : 0;
   const totalOnChain = tickerCount ? Number(tickerCount) : 0;
+
+  // Only count proposals from on-chain registered meetings
+  const onChainTickers = totalOnChain > 0
+    ? MOCK_MEETINGS.filter((m) =>
+        ["TSLA", "AAPL", "NVDA", "MSFT"].includes(m.ticker.toUpperCase())
+      )
+    : [];
+  const totalProposals = onChainTickers.reduce((acc, m) => acc + m.proposalCount, 0);
 
   const stats = [
     {
       label: "Active Meetings",
-      value: activeMeetings.toString(),
+      value: activeMeetings > 0 ? activeMeetings.toString() : "—",
     },
     {
       label: "Total Proposals",
-      value: MOCK_MEETINGS.reduce((acc, m) => acc + m.proposalCount, 0).toString(),
+      value: totalProposals > 0 ? totalProposals.toString() : "—",
     },
     {
       label: "On-Chain",

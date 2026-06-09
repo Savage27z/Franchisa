@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Droplets, CheckCircle2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,13 @@ export default function FaucetPage() {
   const { address, isConnected } = useAccount();
   const { balance, formatted, refetch: refetchBalance } = useTokenBalance();
   const { claimTokens, txHash, isPending, isConfirming, isSuccess, error } = useFaucet();
+
+  // Refresh balance after successful claim
+  useEffect(() => {
+    if (isSuccess) {
+      refetchBalance();
+    }
+  }, [isSuccess, refetchBalance]);
 
   const handleClaim = () => {
     // Claim 1,000 mTSLA tokens

@@ -3,13 +3,14 @@
 import { use } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useReadContract } from "wagmi";
 import { ArrowLeft, ExternalLink, Zap } from "lucide-react";
 import { ProposalCard } from "@/components/proposal-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MOCK_MEETINGS } from "@/lib/mock-data";
 import { useMeetingDetail } from "@/hooks/use-meetings";
-import { CONTRACT_ADDRESSES } from "@/lib/contracts";
+import { CONTRACT_ADDRESSES, REGISTRY_ABI, tickerToBytes32 } from "@/lib/contracts";
 
 export default function MeetingDetailPage({
   params,
@@ -19,6 +20,16 @@ export default function MeetingDetailPage({
   const { ticker } = use(params);
   const router = useRouter();
   const { meeting, isOnChain, isLoading } = useMeetingDetail(ticker);
+
+  // Read real on-chain voter count for proposal 1 (representative)
+  const { data: onChainVoterCount } = useReadContract({
+    address: CONTRACT_ADDRESSES.registry as `0x${string}`,
+    abi: REGISTRY_ABI,
+    functionName: "getVoterCount",
+    args: [tickerToBytes32(ticker), 1],
+    query: { enabled: isOnChain },
+  });
+  const realVoterCount = onChainVoterCount ? Number(onChainVoterCount) : 0;
 
   if (isLoading) {
     return (
@@ -126,7 +137,7 @@ export default function MeetingDetailPage({
             { label: "Proposals", value: meeting.proposalCount },
             {
               label: "Voters",
-              value: meeting.totalVoters.toLocaleString(),
+              value: isOnChain ? realVoterCount.toLocaleString() : meeting.totalVoters.toLocaleString(),
             },
             {
               label: "Remaining",

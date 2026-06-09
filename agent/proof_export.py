@@ -237,8 +237,8 @@ def generate_demo_proof() -> dict:
             "network": "arbitrum-sepolia",
             "chainId": 421614,
             "contracts": {
-                "registry": os.environ.get("REGISTRY_CONTRACT_ADDRESS", "0x1Bf8fa37150a05e932AE0b99ad8E5CB7050d834c"),
-                "stylusEngine": os.environ.get("STYLUS_ENGINE_ADDRESS", "0x4956dB7e5604B197C8a44eDb165a6e530C4848C3"),
+                "registry": os.environ.get("REGISTRY_CONTRACT_ADDRESS", "0x35b0dA10c9304aE5c4F08904ACC4D8901d537AE2"),
+                "stylusEngine": os.environ.get("STYLUS_ENGINE_ADDRESS", "0x224304493CF93c4ea7ad8904c2A43bcdb808cF2f"),
             },
             "meeting": {
                 "ticker": "TSLA",
