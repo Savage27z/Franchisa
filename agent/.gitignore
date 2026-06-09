@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+parsed_*.json
+franchisa_proof_*.json
+demo_filing.txt

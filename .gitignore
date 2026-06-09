@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment files
+.env
+.env.local
+.env*.local
+
+# Build outputs
+.next/
+out/
+dist/
+target/
+
+# Foundry
+contracts/solidity/cache/
+contracts/solidity/out/
+contracts/solidity/broadcast/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log

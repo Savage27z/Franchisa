@@ -1,0 +1,5 @@
+{
+  "tickers": ["TSLA", "AAPL", "NVDA", "MSFT", "AMZN", "GOOGL", "META", "JPM"],
+  "poll_interval_hours": 6,
+  "description": "Companies to monitor for new DEF 14A proxy filings on SEC EDGAR"
+}
