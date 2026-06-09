@@ -8,6 +8,7 @@
 // ─── Chain Config ────────────────────────────────────────────────────────────
 
 export const ARBITRUM_SEPOLIA_CHAIN_ID = 421614;
+export const ROBINHOOD_TESTNET_CHAIN_ID = 46630;
 
 // ─── Contract Addresses (update after deployment) ────────────────────────────
 
@@ -15,6 +16,12 @@ export const CONTRACT_ADDRESSES = {
   registry: process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || "0x0000000000000000000000000000000000000000",
   stylusEngine: process.env.NEXT_PUBLIC_STYLUS_ADDRESS || "0x0000000000000000000000000000000000000000",
   mockToken: process.env.NEXT_PUBLIC_TOKEN_ADDRESS || "0x0000000000000000000000000000000000000000",
+} as const;
+
+// ─── Robinhood Chain Testnet Addresses ──────────────────────────────────────
+
+export const ROBINHOOD_ADDRESSES = {
+  mockToken: process.env.NEXT_PUBLIC_ROBINHOOD_TOKEN_ADDRESS || "0x4956dB7e5604B197C8a44eDb165a6e530C4848C3",
 } as const;
 
 // ─── Registry ABI (read + write functions we need) ───────────────────────────
