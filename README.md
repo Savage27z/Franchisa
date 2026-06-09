@@ -135,6 +135,7 @@ See [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md) for detailed forge gas report dat
 | Registry on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0x35b0dA10c9304aE5c4F08904ACC4D8901d537AE2) |
 | Engine on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0x224304493CF93c4ea7ad8904c2A43bcdb808cF2f) |
 | Token on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xE2769d8731577608454Fc1Aeb080978134be7Fdf) |
+| mTSLA on Robinhood Chain | [View Contract (Verified)](https://explorer.testnet.chain.robinhood.com/address/0x4956dB7e5604B197C8a44eDb165a6e530C4848C3) |
 
 ---
 
@@ -149,7 +150,13 @@ See [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md) for detailed forge gas report dat
 
 **Chain**: Arbitrum Sepolia (Chain ID `421614`)
 
-**Currently Registered Meetings:**
+### Robinhood Chain Testnet (Chain ID `46630`)
+
+| Contract | Address | Purpose |
+|----------|---------|---------|
+| **MockTokenizedStock (mTSLA)** | [`0x4956dB7e5604B197C8a44eDb165a6e530C4848C3`](https://explorer.testnet.chain.robinhood.com/address/0x4956dB7e5604B197C8a44eDb165a6e530C4848C3) | ERC-20 tokenized stock on Robinhood's financial-grade L2 (verified) |
+
+**Currently Registered Meetings (Arbitrum Sepolia):**
 
 | Ticker | Company | Proposals | Meeting Date |
 |--------|---------|-----------|-------------|
