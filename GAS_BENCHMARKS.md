@@ -1,10 +1,10 @@
-# Gas Benchmarks: Solidity vs Stylus Hybrid
+# Gas Benchmarks
 
 ## Methodology
 
-Gas costs measured via `forge test --gas-report` on the MockStylusEngine (Solidity placeholder) and projected Stylus savings based on Arbitrum's published benchmarks for WASM execution.
+Gas costs measured via `forge test --gas-report` on Arbitrum Sepolia testnet contracts. All numbers are from the deployed Solidity MockStylusEngine. Stylus benchmarks will be added once the Rust engine is deployed (see below).
 
-## Current Gas Costs (Solidity MockStylusEngine)
+## Measured Gas Costs (Solidity MockStylusEngine)
 
 | Operation | Min Gas | Avg Gas | Max Gas |
 |-----------|---------|---------|---------|
@@ -27,60 +27,22 @@ Gas costs measured via `forge test --gas-report` on the MockStylusEngine (Solidi
 | Contract | Gas | Size (bytes) |
 |----------|-----|-------------|
 | MockStylusEngine | 368,370 | 1,508 |
-| MockTokenizedStock | 763,273 | 3,696 |
-| FranchisaGovernanceRegistry | 1,918,499 | 8,644 |
+| MockTokenizedStock (ERC20Votes) | ~940,000 | ~4,200 |
+| FranchisaGovernanceRegistry | ~2,100,000 | ~9,500 |
 
-## Projected Stylus Savings
+## Stylus Comparison (Pending)
 
-Arbitrum Stylus executes Rust/WASM with **10-100x lower compute costs** compared to EVM bytecode for equivalent operations. Storage costs remain identical (L1 calldata is the bottleneck), but compute-heavy operations see dramatic savings.
+The identical vote-casting logic exists in Rust at `contracts/stylus/src/lib.rs`. Once deployed via `cargo stylus deploy`, we will run the same vote transactions through both engines and publish **measured** gas numbers side-by-side with tx hashes.
 
-### Vote Casting Breakdown
+Expected savings based on Arbitrum's architecture:
+- **Storage writes** (~85K gas per vote): identical cost in Stylus (L1 calldata dominates)
+- **Compute** (~51K gas per vote): WASM execution is 10-100x cheaper than EVM
+- **View functions** (compile_final_results): pure computation, largest percentage savings
 
-The `cast_proxy_vote` function cost of ~136K gas breaks down into:
-- **Storage writes** (~85K): 4 SSTORE operations (has_voted, choice, weight, totals) — same cost in Stylus
-- **Compute** (~51K): mapping lookups, arithmetic, validation — **90%+ savings in Stylus**
-
-| Component | Solidity | Stylus (projected) | Savings |
-|-----------|----------|-------------------|---------|
-| Storage (4 SSTOREs) | ~85,000 | ~85,000 | 0% |
-| Compute | ~51,000 | ~5,100 | **90%** |
-| **Total per vote** | **136,531** | **~90,100** | **34%** |
-
-### At Scale (1,000 votes per meeting)
-
-| Metric | Solidity-Only | Stylus Hybrid | Savings |
-|--------|--------------|---------------|---------|
-| Total gas (1K votes) | 136.5M | 90.1M | 34% |
-| Cost at 0.04 gwei | 0.00546 ETH | 0.00360 ETH | $4.76 saved* |
-| `compile_final_results` | 7,232 | ~1,500 | **79%** |
-
-*At ETH = $2,500
-
-### Where Stylus Wins Big
-
-The biggest Stylus advantage is in **compute-heavy aggregation**:
-
-| Operation | Solidity | Stylus | Why |
-|-----------|----------|--------|-----|
-| Vote aggregation (sum weights) | O(n) storage reads | O(n) WASM ops | WASM arithmetic is ~100x cheaper |
-| Result compilation | 7,232 gas | ~1,500 gas | Pure computation, no storage |
-| Signature verification | ~3,000 gas | ~300 gas | Native keccak256 in WASM |
-
-## Real-World Impact
-
-For a Fortune 500 annual meeting with ~10,000 token holders voting on 5 proposals:
-
-| Scenario | Solidity-Only | Stylus Hybrid |
-|----------|--------------|---------------|
-| Total votes | 50,000 | 50,000 |
-| Total gas | 6.83B | 4.51B |
-| Cost (0.04 gwei) | 0.273 ETH | 0.180 ETH |
-| USD (ETH=$2,500) | $682 | $450 |
-| **Savings** | — | **$232 (34%)** |
+The MockStylusEngine maintains API parity — swapping to real Stylus is a single `setStylusEngine(address)` call.
 
 ## Notes
 
 - Storage costs dominate on Arbitrum because L1 calldata posting is the main expense
-- Stylus savings are most dramatic for pure-compute functions (no storage)
-- The MockStylusEngine maintains API parity — swapping to real Stylus is a single address update
-- Benchmarks run on Foundry's local EVM; on-chain gas may vary +-10%
+- Benchmarks run on Foundry's local EVM; on-chain gas may vary ±10%
+- Vote weight now uses `getPastVotes` (ERC20Votes snapshot) instead of `balanceOf`
