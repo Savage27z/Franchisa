@@ -107,13 +107,21 @@ python agent.py proof --ticker TSLA --demo-mode
 python agent.py verify franchisa_proof_TSLA.json
 ```
 
+## Live Demo
+
+- **Frontend**: [franchisa.vercel.app](https://franchisa.vercel.app) (if deployed)
+- **Arbiscan**: [View Registry](https://sepolia.arbiscan.io/address/0x35b0dA10c9304aE5c4F08904ACC4D8901d537AE2)
+
 ## Deployed Contracts (Arbitrum Sepolia)
 
-| Contract | Address |
-|----------|---------|
-| FranchisaGovernanceRegistry | `TBD` |
-| ProxyOracle (Stylus) | `TBD` |
-| MockTokenizedStock (mTSLA) | `TBD` |
+| Contract | Address | Arbiscan |
+|----------|---------|----------|
+| FranchisaGovernanceRegistry | `0x35b0dA10c9304aE5c4F08904ACC4D8901d537AE2` | [View](https://sepolia.arbiscan.io/address/0x35b0dA10c9304aE5c4F08904ACC4D8901d537AE2) |
+| MockStylusEngine | `0x224304493CF93c4ea7ad8904c2A43bcdb808cF2f` | [View](https://sepolia.arbiscan.io/address/0x224304493CF93c4ea7ad8904c2A43bcdb808cF2f) |
+| MockTokenizedStock (mTSLA) | `0xE2769d8731577608454Fc1Aeb080978134be7Fdf` | [View](https://sepolia.arbiscan.io/address/0xE2769d8731577608454Fc1Aeb080978134be7Fdf) |
+| Agent/Deployer | `0xD78D1D5Dd356DECc696192D68b2cd046266D3046` | [View](https://sepolia.arbiscan.io/address/0xD78D1D5Dd356DECc696192D68b2cd046266D3046) |
+
+**Registered Meetings**: TSLA (4 proposals), AAPL (3), NVDA (3), MSFT (5)
 
 ## Project Structure
 
