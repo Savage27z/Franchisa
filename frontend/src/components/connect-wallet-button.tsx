@@ -35,10 +35,12 @@ export function ConnectWalletButton() {
                   <LiquidButton
                     onClick={openConnectModal}
                     size="sm"
-                    className="text-xs h-8 px-3 rounded-lg"
+                    className="text-xs h-9 px-4 rounded-xl flex-row flex-nowrap"
                   >
-                    <Wallet className="h-3.5 w-3.5 mr-1" />
-                    Connect
+                    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                      <Wallet className="h-3.5 w-3.5 shrink-0" />
+                      Connect Wallet
+                    </span>
                   </LiquidButton>
                 );
               }
