@@ -1,0 +1,70 @@
+name: Deploy Stylus Engine
+
+on:
+  workflow_dispatch:
+    inputs:
+      registry_address:
+        description: 'Registry contract address to authorize'
+        required: true
+        default: '0x648af8CEd63dA3CB014150b543C6e3a2d54c0e37'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install cargo-stylus
+        run: cargo install cargo-stylus
+
+      - name: Check Stylus contract
+        working-directory: contracts/stylus
+        run: cargo stylus check --endpoint https://sepolia-rollup.arbitrum.io/rpc
+
+      - name: Deploy Stylus contract
+        working-directory: contracts/stylus
+        run: |
+          cargo stylus deploy \
+            --endpoint https://sepolia-rollup.arbitrum.io/rpc \
+            --private-key ${{ secrets.DEPLOYER_PRIVATE_KEY }} \
+            --no-verify \
+            2>&1 | tee deploy-output.txt
+
+          # Extract deployed address
+          STYLUS_ADDRESS=$(grep -oP 'deployed code at address: \K0x[a-fA-F0-9]+' deploy-output.txt || true)
+          echo "STYLUS_ADDRESS=$STYLUS_ADDRESS" >> $GITHUB_ENV
+          echo "## Stylus Engine Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "Address: \`$STYLUS_ADDRESS\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Set authorized registry on Stylus engine
+        if: env.STYLUS_ADDRESS != ''
+        run: |
+          # Install cast (foundry)
+          curl -L https://foundry.paradigm.xyz | bash
+          source ~/.bashrc || true
+          ~/.foundry/bin/foundryup
+
+          ~/.foundry/bin/cast send ${{ env.STYLUS_ADDRESS }} \
+            "set_authorized_registry(address)" \
+            ${{ github.event.inputs.registry_address }} \
+            --rpc-url https://sepolia-rollup.arbitrum.io/rpc \
+            --private-key ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+
+          echo "## Registry Authorized" >> $GITHUB_STEP_SUMMARY
+          echo "Registry \`${{ github.event.inputs.registry_address }}\` authorized on Stylus engine \`${{ env.STYLUS_ADDRESS }}\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Gas benchmark — vote via Solidity engine
+        if: env.STYLUS_ADDRESS != ''
+        run: |
+          echo "## Gas Comparison" >> $GITHUB_STEP_SUMMARY
+          echo "Run submitVote through both engines on the same meeting and compare gas." >> $GITHUB_STEP_SUMMARY
+          echo "Solidity engine: \`0x224304493CF93c4ea7ad8904c2A43bcdb808cF2f\`" >> $GITHUB_STEP_SUMMARY
+          echo "Stylus engine: \`${{ env.STYLUS_ADDRESS }}\`" >> $GITHUB_STEP_SUMMARY
