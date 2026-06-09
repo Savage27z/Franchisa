@@ -98,6 +98,7 @@ export const REGISTRY_ABI = [
           { name: "filingHash", type: "bytes32" },
           { name: "accessionNumber", type: "string" },
           { name: "snapshotBlock", type: "uint256" },
+          { name: "meetingId", type: "uint256" },
         ],
         name: "",
         type: "tuple",

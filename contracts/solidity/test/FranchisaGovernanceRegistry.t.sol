@@ -6,61 +6,65 @@ import "../src/FranchisaGovernanceRegistry.sol";
 import "../src/MockTokenizedStock.sol";
 
 /// @dev Minimal mock that simulates the Stylus voting engine for unit tests.
-///      Uses a nonce-based approach so each call is treated as a unique voter
-///      (in production, the Stylus contract uses msg::sender() which is tx.origin).
+///      Keyed by (ticker, meetingId, proposalId) to support meeting epochs.
 contract MockStylusEngine {
-    // voter address => ticker => proposalId => voted
-    mapping(address => mapping(bytes32 => mapping(uint8 => bool))) public voted;
-    // ticker => proposalId => choice => weight
-    mapping(bytes32 => mapping(uint8 => mapping(uint8 => uint256))) public weights;
-    // ticker => proposalId => count
-    mapping(bytes32 => mapping(uint8 => uint256)) public counts;
+    // voter => ticker => meetingId => proposalId => voted
+    mapping(address => mapping(bytes32 => mapping(uint256 => mapping(uint8 => bool)))) public voted;
+    // ticker => meetingId => proposalId => choice => weight
+    mapping(bytes32 => mapping(uint256 => mapping(uint8 => mapping(uint8 => uint256)))) public weights;
+    // ticker => meetingId => proposalId => count
+    mapping(bytes32 => mapping(uint256 => mapping(uint8 => uint256))) public counts;
 
     function cast_proxy_vote(
         address voter,
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId,
         uint8 choice,
         uint256 balance
     ) external returns (bool) {
-        if (voted[voter][ticker][proposalId]) return false;
-        voted[voter][ticker][proposalId] = true;
+        if (voted[voter][ticker][meetingId][proposalId]) return false;
+        voted[voter][ticker][meetingId][proposalId] = true;
         if (choice > 2 || balance == 0) return false;
 
-        weights[ticker][proposalId][choice] += balance;
-        counts[ticker][proposalId]++;
+        weights[ticker][meetingId][proposalId][choice] += balance;
+        counts[ticker][meetingId][proposalId]++;
         return true;
     }
 
     function compile_final_results(
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId
     ) external view returns (uint256, uint256, uint256) {
         return (
-            weights[ticker][proposalId][1], // yes
-            weights[ticker][proposalId][0], // no
-            weights[ticker][proposalId][2]  // abstain
+            weights[ticker][meetingId][proposalId][1], // yes
+            weights[ticker][meetingId][proposalId][0], // no
+            weights[ticker][meetingId][proposalId][2]  // abstain
         );
     }
 
     function get_voter_count(
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId
     ) external view returns (uint256) {
-        return counts[ticker][proposalId];
+        return counts[ticker][meetingId][proposalId];
     }
 
     function has_user_voted(
         address voter,
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId
     ) external view returns (bool) {
-        return voted[voter][ticker][proposalId];
+        return voted[voter][ticker][meetingId][proposalId];
     }
 
     function get_user_vote(
         address,
         bytes32,
+        uint256,
         uint8
     ) external pure returns (uint8, uint256) {
         return (0, 0);
@@ -460,6 +464,52 @@ contract FranchisaGovernanceRegistryTest is Test {
         bytes32 reconstructed = keccak256("DEF 14A filing text for Tesla Inc 2026");
         FranchisaGovernanceRegistry.Meeting memory m = registry.getMeeting(TSLA);
         assertEq(m.filingHash, reconstructed);
+    }
+
+    // ─── Meeting epoch isolation test ────────────────────────────────
+
+    function test_meetingEpoch_freshVotingAfterReRegister() public {
+        // Epoch 1: register, vote, close
+        _registerTSLAMeeting();
+
+        vm.prank(voter1);
+        registry.submitVote(TSLA, 1, 1); // Yes in epoch 1
+
+        vm.prank(agent);
+        registry.closeMeeting(TSLA);
+
+        // Epoch 2: re-register same ticker — voter1 should be able to vote again
+        vm.roll(block.number + 1);
+        _registerTSLAMeeting();
+
+        // This would revert with "Stylus vote execution failed" without meetingId epochs
+        vm.prank(voter1);
+        registry.submitVote(TSLA, 1, 0); // No in epoch 2 — different vote, same proposal
+
+        (uint256 yes, uint256 no,) = registry.getResults(TSLA, 1);
+        // Only epoch 2 results should appear (epoch 1 data is isolated)
+        assertEq(yes, 0);
+        assertEq(no, 1000 * 10 ** 18);
+    }
+
+    function test_meetingNonce_increments() public {
+        assertEq(registry.meetingNonce(), 0);
+
+        _registerTSLAMeeting();
+        assertEq(registry.meetingNonce(), 1);
+
+        FranchisaGovernanceRegistry.Meeting memory m = registry.getMeeting(TSLA);
+        assertEq(m.meetingId, 1);
+
+        // Close and re-register
+        vm.prank(agent);
+        registry.closeMeeting(TSLA);
+        vm.roll(block.number + 1);
+        _registerTSLAMeeting();
+        assertEq(registry.meetingNonce(), 2);
+
+        m = registry.getMeeting(TSLA);
+        assertEq(m.meetingId, 2);
     }
 
     // ─── Invariant-style check ──────────────────────────────────────

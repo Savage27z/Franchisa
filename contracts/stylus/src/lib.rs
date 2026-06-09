@@ -18,20 +18,20 @@ pub struct ProxyOracle {
     /// Owner who deployed the contract (can set the registry)
     pub owner: StorageAddress,
 
-    /// user_address => ticker => proposal_id => has_voted
-    pub has_voted: StorageMap<Address, StorageMap<[u8; 32], StorageMap<u8, StorageBool>>>,
+    /// user_address => ticker => meeting_id => proposal_id => has_voted
+    pub has_voted: StorageMap<Address, StorageMap<[u8; 32], StorageMap<U256, StorageMap<u8, StorageBool>>>>,
 
-    /// user_address => ticker => proposal_id => choice
-    pub user_choices: StorageMap<Address, StorageMap<[u8; 32], StorageMap<u8, StorageU8>>>,
+    /// user_address => ticker => meeting_id => proposal_id => choice
+    pub user_choices: StorageMap<Address, StorageMap<[u8; 32], StorageMap<U256, StorageMap<u8, StorageU8>>>>,
 
-    /// user_address => ticker => proposal_id => weight
-    pub user_weights: StorageMap<Address, StorageMap<[u8; 32], StorageMap<u8, StorageU256>>>,
+    /// user_address => ticker => meeting_id => proposal_id => weight
+    pub user_weights: StorageMap<Address, StorageMap<[u8; 32], StorageMap<U256, StorageMap<u8, StorageU256>>>>,
 
-    /// ticker => proposal_id => choice (0=No, 1=Yes, 2=Abstain) => total_weight
-    pub total_weights: StorageMap<[u8; 32], StorageMap<u8, StorageMap<u8, StorageU256>>>,
+    /// ticker => meeting_id => proposal_id => choice (0=No, 1=Yes, 2=Abstain) => total_weight
+    pub total_weights: StorageMap<[u8; 32], StorageMap<U256, StorageMap<u8, StorageMap<u8, StorageU256>>>>,
 
-    /// ticker => proposal_id => voter_count
-    pub voter_count: StorageMap<[u8; 32], StorageMap<u8, StorageU256>>,
+    /// ticker => meeting_id => proposal_id => voter_count
+    pub voter_count: StorageMap<[u8; 32], StorageMap<U256, StorageMap<u8, StorageU256>>>,
 }
 
 #[public]
@@ -57,12 +57,15 @@ impl ProxyOracle {
     /// NOT the EOA. We enforce that only the registry can call this function, and the
     /// registry passes the real voter address as a parameter after verifying their token balance.
     ///
+    /// meeting_id: Epoch identifier — isolates vote storage per meeting cycle so closing
+    ///             and re-registering the same ticker starts with a clean slate.
     /// choice: 0 = No, 1 = Yes, 2 = Abstain
     /// token_balance: the user's tokenized stock balance, used as vote weight
     pub fn cast_proxy_vote(
         &mut self,
         voter: Address,
         ticker: [u8; 32],
+        meeting_id: U256,
         proposal_id: u8,
         choice: u8,
         token_balance: U256,
@@ -76,8 +79,8 @@ impl ProxyOracle {
             );
         }
 
-        // Prevent double voting
-        let already_voted = self.has_voted.getter(voter).getter(ticker).get(proposal_id);
+        // Prevent double voting within the same meeting epoch
+        let already_voted = self.has_voted.getter(voter).getter(ticker).getter(meeting_id).get(proposal_id);
         if already_voted {
             return false;
         }
@@ -93,47 +96,50 @@ impl ProxyOracle {
         }
 
         // Record the vote
-        self.has_voted.setter(voter).setter(ticker).insert(proposal_id, true);
-        self.user_choices.setter(voter).setter(ticker).insert(proposal_id, choice);
-        self.user_weights.setter(voter).setter(ticker).insert(proposal_id, token_balance);
+        self.has_voted.setter(voter).setter(ticker).setter(meeting_id).insert(proposal_id, true);
+        self.user_choices.setter(voter).setter(ticker).setter(meeting_id).insert(proposal_id, choice);
+        self.user_weights.setter(voter).setter(ticker).setter(meeting_id).insert(proposal_id, token_balance);
 
         // Update aggregated totals
-        let current = self.total_weights.getter(ticker).getter(proposal_id).get(choice);
+        let current = self.total_weights.getter(ticker).getter(meeting_id).getter(proposal_id).get(choice);
         self.total_weights
             .setter(ticker)
+            .setter(meeting_id)
             .setter(proposal_id)
             .insert(choice, current + token_balance);
 
         // Increment voter count
-        let count = self.voter_count.getter(ticker).get(proposal_id);
+        let count = self.voter_count.getter(ticker).getter(meeting_id).get(proposal_id);
         self.voter_count
             .setter(ticker)
+            .setter(meeting_id)
             .insert(proposal_id, count + U256::from(1));
 
         true
     }
 
-    /// Returns the aggregated results for a specific proposal
+    /// Returns the aggregated results for a specific proposal in a meeting epoch
     /// Returns (yes_weight, no_weight, abstain_weight)
     pub fn compile_final_results(
         &self,
         ticker: [u8; 32],
+        meeting_id: U256,
         proposal_id: u8,
     ) -> (U256, U256, U256) {
-        let yes = self.total_weights.getter(ticker).getter(proposal_id).get(1);
-        let no = self.total_weights.getter(ticker).getter(proposal_id).get(0);
-        let abstain = self.total_weights.getter(ticker).getter(proposal_id).get(2);
+        let yes = self.total_weights.getter(ticker).getter(meeting_id).getter(proposal_id).get(1);
+        let no = self.total_weights.getter(ticker).getter(meeting_id).getter(proposal_id).get(0);
+        let abstain = self.total_weights.getter(ticker).getter(meeting_id).getter(proposal_id).get(2);
         (yes, no, abstain)
     }
 
     /// Returns the total number of unique voters for a proposal
-    pub fn get_voter_count(&self, ticker: [u8; 32], proposal_id: u8) -> U256 {
-        self.voter_count.getter(ticker).get(proposal_id)
+    pub fn get_voter_count(&self, ticker: [u8; 32], meeting_id: U256, proposal_id: u8) -> U256 {
+        self.voter_count.getter(ticker).getter(meeting_id).get(proposal_id)
     }
 
     /// Checks if a specific address has voted on a proposal
-    pub fn has_user_voted(&self, voter: Address, ticker: [u8; 32], proposal_id: u8) -> bool {
-        self.has_voted.getter(voter).getter(ticker).get(proposal_id)
+    pub fn has_user_voted(&self, voter: Address, ticker: [u8; 32], meeting_id: U256, proposal_id: u8) -> bool {
+        self.has_voted.getter(voter).getter(ticker).getter(meeting_id).get(proposal_id)
     }
 
     /// Returns a user's vote details (choice, weight) for a specific proposal
@@ -141,10 +147,11 @@ impl ProxyOracle {
         &self,
         voter: Address,
         ticker: [u8; 32],
+        meeting_id: U256,
         proposal_id: u8,
     ) -> (u8, U256) {
-        let choice = self.user_choices.getter(voter).getter(ticker).get(proposal_id);
-        let weight = self.user_weights.getter(voter).getter(ticker).get(proposal_id);
+        let choice = self.user_choices.getter(voter).getter(ticker).getter(meeting_id).get(proposal_id);
+        let weight = self.user_weights.getter(voter).getter(ticker).getter(meeting_id).get(proposal_id);
         (choice, weight)
     }
 }

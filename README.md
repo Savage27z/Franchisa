@@ -133,8 +133,8 @@ See [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md) for detailed forge gas report dat
 | Resource | Link |
 |----------|------|
 | Frontend | [franchisa.vercel.app](https://franchisa.vercel.app) |
-| Registry on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0x648af8CEd63dA3CB014150b543C6e3a2d54c0e37) |
-| Engine on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0x224304493CF93c4ea7ad8904c2A43bcdb808cF2f) |
+| Registry on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xca55b1c8ce1d15109417Db6f3D987C8B903F9f45) |
+| Engine on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xF7D8891eB22Be860c2F666CcBFB2D81d28229aa1) |
 | Token on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b) |
 | mTSLA on Robinhood Chain | [View Contract (Verified)](https://explorer.testnet.chain.robinhood.com/address/0x4956dB7e5604B197C8a44eDb165a6e530C4848C3) |
 
@@ -144,8 +144,8 @@ See [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md) for detailed forge gas report dat
 
 | Contract | Address | Purpose |
 |----------|---------|---------|
-| **FranchisaGovernanceRegistry** | [`0x648af8CEd63dA3CB014150b543C6e3a2d54c0e37`](https://sepolia.arbiscan.io/address/0x648af8CEd63dA3CB014150b543C6e3a2d54c0e37) | Meeting registration, vote routing, token balance checks |
-| **MockStylusEngine** | [`0x224304493CF93c4ea7ad8904c2A43bcdb808cF2f`](https://sepolia.arbiscan.io/address/0x224304493CF93c4ea7ad8904c2A43bcdb808cF2f) | Vote storage and aggregation (Solidity stand-in for Stylus) |
+| **FranchisaGovernanceRegistry** | [`0xca55b1c8ce1d15109417Db6f3D987C8B903F9f45`](https://sepolia.arbiscan.io/address/0xca55b1c8ce1d15109417Db6f3D987C8B903F9f45) | Meeting registration, vote routing, token balance checks |
+| **MockStylusEngine** | [`0xF7D8891eB22Be860c2F666CcBFB2D81d28229aa1`](https://sepolia.arbiscan.io/address/0xF7D8891eB22Be860c2F666CcBFB2D81d28229aa1) | Vote storage and aggregation (Solidity stand-in for Stylus) |
 | **MockTokenizedStock (mTSLA)** | [`0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b`](https://sepolia.arbiscan.io/address/0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b) | ERC-20 tokenized stock with public faucet |
 | **Agent/Deployer** | [`0xD78D1D5Dd356DECc696192D68b2cd046266D3046`](https://sepolia.arbiscan.io/address/0xD78D1D5Dd356DECc696192D68b2cd046266D3046) | Authorized agent that submits proposals |
 
@@ -202,7 +202,7 @@ forge build         # Compile with via-ir
 ### Test
 
 ```bash
-forge test -vv      # Run all 32 tests with verbose output
+forge test -vv      # Run all 34 tests with verbose output
 ```
 
 **Test coverage:**
@@ -421,6 +421,8 @@ User -> Registry (validates token balance) -> Engine (records vote)
 - **Snapshot voting**: Vote weight = `getPastVotes(voter, snapshotBlock)` — balance is locked at the block when the meeting was registered, preventing transfer-and-vote attacks
 - **ERC20Votes token**: mTSLA uses OpenZeppelin's `ERC20Votes` with auto-delegation on faucet/mint
 - **Meeting date enforcement**: `require(block.timestamp < meetingDate)` — votes rejected after the meeting date passes
+- **Meeting epochs**: Each `registerMeeting` assigns a monotonically increasing `meetingId` nonce. Engine storage is keyed by `(ticker, meetingId, proposalId)` — closing and re-registering the same ticker starts a clean epoch with no stale vote flags
+- **Ticker deduplication**: `_tickerRegistered` mapping prevents the registered tickers array from inflating on re-registration
 - Choice validation: only 0 (No), 1 (Yes), 2 (Abstain) accepted
 - Proposal ID validation: must match registered proposals
 - Meeting must be active (not closed)
@@ -447,7 +449,7 @@ This is a hackathon prototype. The following limitations are acknowledged and wo
 | **Agent key = proof signer** | Same key registers meetings and signs proofs | Separate signing key with HSM; proof signed via EIP-712 typed data |
 | **No governance timelock** | `setStylusEngine` can swap engine mid-meeting | Timelock contract (48h delay) on all admin functions |
 | **EDGAR content injection** | Filing text passed to Claude could contain prompt injection | Schema-validate parsed output with Pydantic; restrict allowed categories |
-| **Engine lacks meeting epochs** | Old vote flags leak if same ticker re-registered | Add meetingId to engine storage keys to isolate epochs |
+| ~~**Engine lacks meeting epochs**~~ | ~~Old vote flags leak if same ticker re-registered~~ | **FIXED** — `meetingId` nonce isolates engine storage per epoch (v2 deploy) |
 
 ---
 
@@ -557,12 +559,12 @@ NEXT_PUBLIC_TOKEN_ADDRESS=0x...
 
 ```bash
 cd contracts/solidity
-forge test -vv                    # 32 tests, verbose
+forge test -vv                    # 34 tests, verbose
 forge test --gas-report           # With gas profiling
 forge test --match-contract Auth  # Only auth guard tests
 ```
 
-**Test Suite (32 tests):**
+**Test Suite (34 tests):**
 
 | Test | What It Verifies |
 |------|-----------------|
@@ -591,6 +593,8 @@ forge test --match-contract Auth  # Only auth guard tests
 | `test_faucet_autoDelegates` | Faucet auto-delegates for immediate voting power |
 | `test_filingHash_storedOnChain` | Filing hash and accession number stored in meeting |
 | `test_filingHash_verifiable` | Anyone can reconstruct hash from original filing text |
+| `test_meetingEpoch_freshVotingAfterReRegister` | Close + re-register same ticker allows fresh voting (epoch isolation) |
+| `test_meetingNonce_increments` | Meeting nonce increments and is stored per meeting |
 | `test_voteWeightsSumCannotExceedSupply` | Total vote weight ≤ token supply (invariant) |
 | `test_ownerCanSetRegistry` | Owner sets authorized registry |
 | `test_nonOwnerCannotSetRegistry` | Non-owner rejected |

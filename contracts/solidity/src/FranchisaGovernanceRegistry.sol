@@ -16,6 +16,7 @@ interface IProxyOracleStylus {
     function cast_proxy_vote(
         address voter,
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId,
         uint8 choice,
         uint256 balance
@@ -23,23 +24,27 @@ interface IProxyOracleStylus {
 
     function compile_final_results(
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId
     ) external view returns (uint256, uint256, uint256);
 
     function get_voter_count(
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId
     ) external view returns (uint256);
 
     function has_user_voted(
         address voter,
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId
     ) external view returns (bool);
 
     function get_user_vote(
         address voter,
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId
     ) external view returns (uint8, uint256);
 }
@@ -62,15 +67,21 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         uint256 registeredAt;
         bool isActive;
         uint8 proposalCount;
-        // ─── Filing provenance (new) ────────────────────────────────
+        // ─── Filing provenance ──────────────────────────────────────
         bytes32 filingHash;         // keccak256 of the raw DEF 14A filing text
         string accessionNumber;     // SEC EDGAR accession number (e.g. "0001193125-26-123456")
-        // ─── Snapshot block for vote weight (new) ───────────────────
+        // ─── Snapshot block for vote weight ─────────────────────────
         uint256 snapshotBlock;      // block.number at registration — getPastVotes uses this
+        // ─── Meeting epoch ──────────────────────────────────────────
+        uint256 meetingId;          // Monotonic nonce — isolates engine vote storage per cycle
     }
 
     address public stylusVotingEngine;
     address public tokenizedAssetRegistry; // ERC20Votes token
+
+    /// @notice Monotonically increasing meeting nonce — each registration gets a unique ID.
+    ///         Prevents stale vote flags in the engine when a ticker is closed & re-registered.
+    uint256 public meetingNonce;
 
     // ticker (bytes32) => Meeting
     mapping(bytes32 => Meeting) public meetings;
@@ -194,6 +205,9 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         // Snapshot is the PREVIOUS block (current block's votes aren't finalized yet)
         uint256 snapshot = block.number - 1;
 
+        // Each meeting gets a unique ID — isolates engine vote storage across epochs
+        uint256 currentMeetingId = ++meetingNonce;
+
         meetings[ticker] = Meeting({
             ticker: ticker,
             companyName: companyName,
@@ -203,7 +217,8 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
             proposalCount: uint8(len),
             filingHash: filingHash,
             accessionNumber: accessionNumber,
-            snapshotBlock: snapshot
+            snapshotBlock: snapshot,
+            meetingId: currentMeetingId
         });
 
         for (uint8 i = 0; i < len; i++) {
@@ -264,6 +279,7 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         bool success = IProxyOracleStylus(stylusVotingEngine).cast_proxy_vote(
             msg.sender,
             ticker,
+            m.meetingId,
             proposalId,
             choice,
             voteWeight
@@ -279,9 +295,11 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         bytes32 ticker,
         uint8 proposalId
     ) external view returns (uint256 yes, uint256 no, uint256 abstain) {
+        uint256 mid = meetings[ticker].meetingId;
         return
             IProxyOracleStylus(stylusVotingEngine).compile_final_results(
                 ticker,
+                mid,
                 proposalId
             );
     }
@@ -290,9 +308,11 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         bytes32 ticker,
         uint8 proposalId
     ) external view returns (uint256) {
+        uint256 mid = meetings[ticker].meetingId;
         return
             IProxyOracleStylus(stylusVotingEngine).get_voter_count(
                 ticker,
+                mid,
                 proposalId
             );
     }
@@ -302,10 +322,12 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         bytes32 ticker,
         uint8 proposalId
     ) external view returns (bool) {
+        uint256 mid = meetings[ticker].meetingId;
         return
             IProxyOracleStylus(stylusVotingEngine).has_user_voted(
                 voter,
                 ticker,
+                mid,
                 proposalId
             );
     }
@@ -315,10 +337,12 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         bytes32 ticker,
         uint8 proposalId
     ) external view returns (uint8 choice, uint256 weight) {
+        uint256 mid = meetings[ticker].meetingId;
         return
             IProxyOracleStylus(stylusVotingEngine).get_user_vote(
                 voter,
                 ticker,
+                mid,
                 proposalId
             );
     }

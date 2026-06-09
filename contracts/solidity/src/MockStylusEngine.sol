@@ -42,25 +42,32 @@ contract MockStylusEngine {
         authorizedRegistry = _registry;
     }
 
-    // voter => ticker => proposalId => voted
-    mapping(address => mapping(bytes32 => mapping(uint8 => bool))) private _hasVoted;
+    // ─── Meeting Epochs ─────────────────────────────────────────────
+    // All vote storage is keyed by (ticker, meetingId, proposalId) so
+    // closing and re-registering the same ticker starts a clean epoch.
+    // The registry assigns a monotonically increasing meetingId per
+    // registration and passes it on every engine call.
 
-    // voter => ticker => proposalId => choice
-    mapping(address => mapping(bytes32 => mapping(uint8 => uint8))) private _userChoices;
+    // voter => ticker => meetingId => proposalId => voted
+    mapping(address => mapping(bytes32 => mapping(uint256 => mapping(uint8 => bool)))) private _hasVoted;
 
-    // voter => ticker => proposalId => weight
-    mapping(address => mapping(bytes32 => mapping(uint8 => uint256))) private _userWeights;
+    // voter => ticker => meetingId => proposalId => choice
+    mapping(address => mapping(bytes32 => mapping(uint256 => mapping(uint8 => uint8)))) private _userChoices;
 
-    // ticker => proposalId => choice => total_weight
-    mapping(bytes32 => mapping(uint8 => mapping(uint8 => uint256))) private _totalWeights;
+    // voter => ticker => meetingId => proposalId => weight
+    mapping(address => mapping(bytes32 => mapping(uint256 => mapping(uint8 => uint256)))) private _userWeights;
 
-    // ticker => proposalId => voter_count
-    mapping(bytes32 => mapping(uint8 => uint256)) private _voterCount;
+    // ticker => meetingId => proposalId => choice => total_weight
+    mapping(bytes32 => mapping(uint256 => mapping(uint8 => mapping(uint8 => uint256)))) private _totalWeights;
+
+    // ticker => meetingId => proposalId => voter_count
+    mapping(bytes32 => mapping(uint256 => mapping(uint8 => uint256))) private _voterCount;
 
     /**
      * @notice Cast a weighted proxy vote. Called ONLY by the governance registry.
      * @param voter The actual voter address (passed from the registry's msg.sender)
      * @param ticker The company ticker as bytes32
+     * @param meetingId Epoch identifier — prevents stale vote flags across meeting cycles
      * @param proposalId The proposal number (1-indexed)
      * @param choice 0=No, 1=Yes, 2=Abstain
      * @param tokenBalance The voter's token balance (vote weight)
@@ -69,25 +76,26 @@ contract MockStylusEngine {
     function cast_proxy_vote(
         address voter,
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId,
         uint8 choice,
         uint256 tokenBalance
     ) external onlyRegistry returns (bool) {
-        // Prevent double voting
-        if (_hasVoted[voter][ticker][proposalId]) return false;
+        // Prevent double voting within the same meeting epoch
+        if (_hasVoted[voter][ticker][meetingId][proposalId]) return false;
 
         // Validate
         if (choice > 2) return false;
         if (tokenBalance == 0) return false;
 
         // Record vote
-        _hasVoted[voter][ticker][proposalId] = true;
-        _userChoices[voter][ticker][proposalId] = choice;
-        _userWeights[voter][ticker][proposalId] = tokenBalance;
+        _hasVoted[voter][ticker][meetingId][proposalId] = true;
+        _userChoices[voter][ticker][meetingId][proposalId] = choice;
+        _userWeights[voter][ticker][meetingId][proposalId] = tokenBalance;
 
         // Update aggregated totals
-        _totalWeights[ticker][proposalId][choice] += tokenBalance;
-        _voterCount[ticker][proposalId]++;
+        _totalWeights[ticker][meetingId][proposalId][choice] += tokenBalance;
+        _voterCount[ticker][meetingId][proposalId]++;
 
         return true;
     }
@@ -97,11 +105,12 @@ contract MockStylusEngine {
      */
     function compile_final_results(
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId
     ) external view returns (uint256 yes, uint256 no, uint256 abstain) {
-        yes = _totalWeights[ticker][proposalId][1];
-        no = _totalWeights[ticker][proposalId][0];
-        abstain = _totalWeights[ticker][proposalId][2];
+        yes = _totalWeights[ticker][meetingId][proposalId][1];
+        no = _totalWeights[ticker][meetingId][proposalId][0];
+        abstain = _totalWeights[ticker][meetingId][proposalId][2];
     }
 
     /**
@@ -109,9 +118,10 @@ contract MockStylusEngine {
      */
     function get_voter_count(
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId
     ) external view returns (uint256) {
-        return _voterCount[ticker][proposalId];
+        return _voterCount[ticker][meetingId][proposalId];
     }
 
     /**
@@ -120,9 +130,10 @@ contract MockStylusEngine {
     function has_user_voted(
         address voter,
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId
     ) external view returns (bool) {
-        return _hasVoted[voter][ticker][proposalId];
+        return _hasVoted[voter][ticker][meetingId][proposalId];
     }
 
     /**
@@ -131,9 +142,10 @@ contract MockStylusEngine {
     function get_user_vote(
         address voter,
         bytes32 ticker,
+        uint256 meetingId,
         uint8 proposalId
     ) external view returns (uint8 choice, uint256 weight) {
-        choice = _userChoices[voter][ticker][proposalId];
-        weight = _userWeights[voter][ticker][proposalId];
+        choice = _userChoices[voter][ticker][meetingId][proposalId];
+        weight = _userWeights[voter][ticker][meetingId][proposalId];
     }
 }

@@ -36,7 +36,8 @@ contract MockStylusEngineAuthTest is Test {
         bool ok = engine.cast_proxy_vote(
             address(0xBEEF),
             TSLA,
-            1,
+            1, // meetingId
+            1, // proposalId
             1, // Yes
             1000 ether
         );
@@ -51,6 +52,7 @@ contract MockStylusEngineAuthTest is Test {
         engine.cast_proxy_vote(
             address(0xBEEF),
             TSLA,
+            1, // meetingId
             1,
             1,
             1000 ether
@@ -63,6 +65,7 @@ contract MockStylusEngineAuthTest is Test {
         bool ok = engine.cast_proxy_vote(
             address(0xBEEF),
             TSLA,
+            1, // meetingId
             1,
             1,
             1000 ether
