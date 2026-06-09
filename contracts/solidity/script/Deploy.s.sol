@@ -27,7 +27,11 @@ contract DeployScript is Script {
         );
         console.log("FranchisaGovernanceRegistry deployed at:", address(registry));
 
-        // 4. Authorize the deployer as an agent (for demo)
+        // 4. Lock the engine to only accept calls from the registry
+        engine.setAuthorizedRegistry(address(registry));
+        console.log("Engine authorized registry:", address(registry));
+
+        // 5. Authorize the deployer as an agent (for demo)
         address agentAddress = vm.envOr("AGENT_ADDRESS", vm.addr(deployerPrivateKey));
         registry.setAgent(agentAddress, true);
         console.log("Agent authorized:", agentAddress);
