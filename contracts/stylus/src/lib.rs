@@ -3,7 +3,7 @@ extern crate alloc;
 
 use stylus_sdk::{
     prelude::*,
-    storage::{StorageMap, StorageU256, StorageBool, StorageU8},
+    storage::{StorageAddress, StorageMap, StorageU256, StorageBool, StorageU8},
     msg,
 };
 use alloy_primitives::{Address, U256};
@@ -11,6 +11,13 @@ use alloy_primitives::{Address, U256};
 #[storage]
 #[entrypoint]
 pub struct ProxyOracle {
+    /// The authorized governance registry contract.
+    /// Only this address can call cast_proxy_vote to prevent vote forgery.
+    pub authorized_registry: StorageAddress,
+
+    /// Owner who deployed the contract (can set the registry)
+    pub owner: StorageAddress,
+
     /// user_address => ticker => proposal_id => has_voted
     pub has_voted: StorageMap<Address, StorageMap<[u8; 32], StorageMap<u8, StorageBool>>>,
 
@@ -29,7 +36,27 @@ pub struct ProxyOracle {
 
 #[public]
 impl ProxyOracle {
-    /// Casts a weighted proxy vote. Called by the Solidity registry after balance validation.
+    /// Set the authorized registry address. Only the owner (deployer) can call this.
+    pub fn set_authorized_registry(&mut self, registry: Address) {
+        let caller = msg::sender();
+        let current_owner = self.owner.get();
+
+        // If owner is zero (first call), set caller as owner
+        if current_owner == Address::ZERO {
+            self.owner.set(caller);
+        } else {
+            assert!(caller == current_owner, "Only owner can set registry");
+        }
+
+        self.authorized_registry.set(registry);
+    }
+
+    /// Casts a weighted proxy vote. Called ONLY by the authorized governance registry.
+    ///
+    /// SECURITY: msg::sender() in Stylus when called cross-contract is the calling contract,
+    /// NOT the EOA. We enforce that only the registry can call this function, and the
+    /// registry passes the real voter address as a parameter after verifying their token balance.
+    ///
     /// choice: 0 = No, 1 = Yes, 2 = Abstain
     /// token_balance: the user's tokenized stock balance, used as vote weight
     pub fn cast_proxy_vote(
@@ -40,6 +67,14 @@ impl ProxyOracle {
         choice: u8,
         token_balance: U256,
     ) -> bool {
+        // SECURITY: Only the authorized registry can cast votes
+        let registry = self.authorized_registry.get();
+        if registry != Address::ZERO {
+            assert!(
+                msg::sender() == registry,
+                "Only the authorized registry can cast votes"
+            );
+        }
 
         // Prevent double voting
         let already_voted = self.has_voted.getter(voter).getter(ticker).get(proposal_id);

@@ -12,8 +12,36 @@ pragma solidity ^0.8.20;
  *
  * @dev In production, this logic runs in Rust via Arbitrum Stylus for
  *      90%+ gas savings on compute-heavy vote aggregation.
+ *
+ * @dev SECURITY: Only the authorized registry contract can call cast_proxy_vote.
+ *      This prevents vote forgery by direct calls to the engine.
  */
 contract MockStylusEngine {
+    /// @notice The governance registry — only caller allowed to cast votes
+    address public authorizedRegistry;
+
+    /// @notice Owner who can set the registry (deployer)
+    address public immutable owner;
+
+    modifier onlyRegistry() {
+        require(
+            authorizedRegistry == address(0) || msg.sender == authorizedRegistry,
+            "MockStylusEngine: caller is not the authorized registry"
+        );
+        _;
+    }
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    /// @notice Lock the engine to a specific registry contract.
+    ///         Once set to a non-zero address, only owner can change it.
+    function setAuthorizedRegistry(address _registry) external {
+        require(msg.sender == owner, "Only owner can set registry");
+        authorizedRegistry = _registry;
+    }
+
     // voter => ticker => proposalId => voted
     mapping(address => mapping(bytes32 => mapping(uint8 => bool))) private _hasVoted;
 
@@ -30,8 +58,8 @@ contract MockStylusEngine {
     mapping(bytes32 => mapping(uint8 => uint256)) private _voterCount;
 
     /**
-     * @notice Cast a weighted proxy vote. Called by the Solidity registry.
-     * @param voter The actual voter address (passed from the registry)
+     * @notice Cast a weighted proxy vote. Called ONLY by the governance registry.
+     * @param voter The actual voter address (passed from the registry's msg.sender)
      * @param ticker The company ticker as bytes32
      * @param proposalId The proposal number (1-indexed)
      * @param choice 0=No, 1=Yes, 2=Abstain
@@ -44,7 +72,7 @@ contract MockStylusEngine {
         uint8 proposalId,
         uint8 choice,
         uint256 tokenBalance
-    ) external returns (bool) {
+    ) external onlyRegistry returns (bool) {
         // Prevent double voting
         if (_hasVoted[voter][ticker][proposalId]) return false;
 
