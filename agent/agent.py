@@ -673,12 +673,15 @@ def status():
                 ticker_bytes = registry.functions.registeredTickers(i).call()
                 meeting = registry.functions.getMeeting(ticker_bytes).call()
 
-                # Decode ticker
-                ticker_str = ticker_bytes.rstrip(b"\x00").decode("utf-8") if isinstance(ticker_bytes, bytes) else ticker_bytes.replace("0x", "").rstrip("0")
-                try:
-                    ticker_str = bytes.fromhex(ticker_bytes.hex().rstrip("0") if hasattr(ticker_bytes, "hex") else ticker_bytes.replace("0x", "").rstrip("0")).decode("utf-8")
-                except Exception:
-                    ticker_str = str(ticker_bytes)[:8]
+                # Decode ticker from bytes32
+                if isinstance(ticker_bytes, bytes):
+                    ticker_str = ticker_bytes.rstrip(b"\x00").decode("utf-8")
+                else:
+                    # hex string from web3
+                    hex_str = ticker_bytes.replace("0x", "").rstrip("0")
+                    if len(hex_str) % 2:
+                        hex_str += "0"
+                    ticker_str = bytes.fromhex(hex_str).decode("utf-8")
 
                 status = "[green]Active[/green]" if meeting[4] else "[red]Closed[/red]"
                 meeting_date = datetime.fromtimestamp(meeting[2]).strftime("%Y-%m-%d") if meeting[2] > 0 else "N/A"

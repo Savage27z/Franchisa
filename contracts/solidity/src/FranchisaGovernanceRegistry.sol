@@ -3,6 +3,8 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 interface IProxyOracleStylus {
     function cast_proxy_vote(
@@ -36,7 +38,7 @@ interface IProxyOracleStylus {
     ) external view returns (uint8, uint256);
 }
 
-contract FranchisaGovernanceRegistry is Ownable {
+contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
     struct Proposal {
         uint8 proposalId;
         string title;
@@ -68,6 +70,9 @@ contract FranchisaGovernanceRegistry is Ownable {
     // List of all registered tickers for enumeration
     bytes32[] public registeredTickers;
 
+    // Cached active meeting counter (avoids O(n) loop in view)
+    uint256 private _activeMeetingCount;
+
     // Authorized agent addresses that can register meetings
     mapping(address => bool) public authorizedAgents;
 
@@ -78,10 +83,17 @@ contract FranchisaGovernanceRegistry is Ownable {
         uint8 proposalCount
     );
 
+    event ProposalRegistered(
+        bytes32 indexed ticker,
+        uint8 indexed proposalId,
+        string title,
+        string category
+    );
+
     event VoteSubmitted(
         address indexed voter,
         bytes32 indexed ticker,
-        uint8 proposalId,
+        uint8 indexed proposalId,
         uint8 choice,
         uint256 weight
     );
@@ -118,6 +130,16 @@ contract FranchisaGovernanceRegistry is Ownable {
         tokenizedAssetRegistry = _registry;
     }
 
+    /// @notice Emergency pause — halts all voting
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Resume operations after pause
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     // ─── Agent Functions ─────────────────────────────────────────────
 
     function registerMeeting(
@@ -131,14 +153,21 @@ contract FranchisaGovernanceRegistry is Ownable {
         string[] calldata riskRatings,
         string[] calldata riskJustifications,
         string[] calldata boardRecommendations
-    ) external onlyAgent {
-        require(proposalIds.length == titles.length, "Array length mismatch");
-        require(proposalIds.length == categories.length, "Array length mismatch");
-        require(proposalIds.length == descriptions.length, "Array length mismatch");
-        require(proposalIds.length == riskRatings.length, "Array length mismatch");
-        require(proposalIds.length == riskJustifications.length, "Array length mismatch");
-        require(proposalIds.length == boardRecommendations.length, "Array length mismatch");
+    ) external onlyAgent whenNotPaused {
+        uint256 len = proposalIds.length;
+        require(len > 0, "Must include at least one proposal");
+        require(len == titles.length, "Array length mismatch");
+        require(len == categories.length, "Array length mismatch");
+        require(len == descriptions.length, "Array length mismatch");
+        require(len == riskRatings.length, "Array length mismatch");
+        require(len == riskJustifications.length, "Array length mismatch");
+        require(len == boardRecommendations.length, "Array length mismatch");
         require(!meetings[ticker].isActive, "Meeting already active for ticker");
+
+        // Enforce sequential proposalIds: must be 1, 2, 3, ... N
+        for (uint8 i = 0; i < len; i++) {
+            require(proposalIds[i] == i + 1, "Proposal IDs must be sequential 1..N");
+        }
 
         meetings[ticker] = Meeting({
             ticker: ticker,
@@ -146,10 +175,10 @@ contract FranchisaGovernanceRegistry is Ownable {
             meetingDate: meetingDate,
             registeredAt: block.timestamp,
             isActive: true,
-            proposalCount: uint8(proposalIds.length)
+            proposalCount: uint8(len)
         });
 
-        for (uint8 i = 0; i < proposalIds.length; i++) {
+        for (uint8 i = 0; i < len; i++) {
             proposals[ticker][proposalIds[i]] = Proposal({
                 proposalId: proposalIds[i],
                 title: titles[i],
@@ -159,15 +188,18 @@ contract FranchisaGovernanceRegistry is Ownable {
                 riskJustification: riskJustifications[i],
                 boardRecommendation: boardRecommendations[i]
             });
+
+            emit ProposalRegistered(ticker, proposalIds[i], titles[i], categories[i]);
         }
 
         registeredTickers.push(ticker);
+        _activeMeetingCount++;
 
         emit MeetingRegistered(
             ticker,
             companyName,
             meetingDate,
-            uint8(proposalIds.length)
+            uint8(len)
         );
     }
 
@@ -177,7 +209,7 @@ contract FranchisaGovernanceRegistry is Ownable {
         bytes32 ticker,
         uint8 proposalId,
         uint8 choice
-    ) external {
+    ) external whenNotPaused nonReentrant {
         require(meetings[ticker].isActive, "No active meeting for ticker");
         require(choice <= 2, "Invalid choice: 0=No, 1=Yes, 2=Abstain");
         require(
@@ -269,14 +301,24 @@ contract FranchisaGovernanceRegistry is Ownable {
         return registeredTickers.length;
     }
 
-    function getActiveMeetingCount() external view returns (uint256 count) {
-        for (uint256 i = 0; i < registeredTickers.length; i++) {
-            if (meetings[registeredTickers[i]].isActive) count++;
-        }
+    /// @notice Returns cached count of active meetings (O(1) instead of O(n))
+    function getActiveMeetingCount() external view returns (uint256) {
+        return _activeMeetingCount;
     }
 
+    /// @notice Close a meeting and clean up stale proposal data
     function closeMeeting(bytes32 ticker) external onlyAgent {
+        require(meetings[ticker].isActive, "Meeting not active");
+
+        // Delete stale proposals to prevent data pollution on re-registration
+        uint8 count = meetings[ticker].proposalCount;
+        for (uint8 i = 1; i <= count; i++) {
+            delete proposals[ticker][i];
+        }
+
         meetings[ticker].isActive = false;
+        _activeMeetingCount--;
+
         emit MeetingClosed(ticker);
     }
 }

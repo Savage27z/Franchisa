@@ -150,29 +150,37 @@ def verify_governance_proof(proof: dict) -> bool:
     Returns:
         True if the proof is valid, False otherwise
     """
-    from web3 import Web3
     from eth_account import Account
     from eth_account.messages import encode_defunct
+    import copy
 
     try:
         inner = proof["franchisa_governance_proof"]
-        signature = inner.pop("signature")
-        signer = inner.pop("signer")
+        signature = inner.get("signature")
+        signer = inner.get("signer")
+
+        if not signature or not signer:
+            console.print("[red]Proof missing signature or signer field[/red]")
+            return False
+
+        # Build a copy without signature/signer for hash reconstruction
+        # (never mutate the original dict — safe against mid-flow exceptions)
+        inner_copy = copy.deepcopy(inner)
+        del inner_copy["signature"]
+        del inner_copy["signer"]
 
         # Reconstruct the payload that was signed
         payload_json = json.dumps(
-            {"franchisa_governance_proof": inner},
+            {"franchisa_governance_proof": inner_copy},
             sort_keys=True,
             separators=(",", ":"),
         )
 
         # Recover the signer from the signature
+        # Handle optional 0x prefix on hex signature
+        sig_hex = signature.removeprefix("0x") if isinstance(signature, str) else signature
         message = encode_defunct(text=payload_json)
-        recovered = Account.recover_message(message, signature=bytes.fromhex(signature))
-
-        # Restore fields
-        inner["signature"] = signature
-        inner["signer"] = signer
+        recovered = Account.recover_message(message, signature=bytes.fromhex(sig_hex))
 
         if recovered.lower() == signer.lower():
             console.print(

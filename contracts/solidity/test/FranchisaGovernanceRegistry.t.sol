@@ -93,9 +93,14 @@ contract FranchisaGovernanceRegistryTest is Test {
         // Authorize agent
         registry.setAgent(agent, true);
 
-        // Give voters some tokens
-        token.faucet(voter1, 1000 * 10 ** 18);
-        token.faucet(voter2, 500 * 10 ** 18);
+        // Give voters some tokens (use owner bulkMint to bypass faucet cooldown)
+        address[] memory recipients = new address[](2);
+        recipients[0] = voter1;
+        recipients[1] = voter2;
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = 1000 * 10 ** 18;
+        amounts[1] = 500 * 10 ** 18;
+        token.bulkMint(recipients, amounts);
     }
 
     function _registerTSLAMeeting() internal {
@@ -162,6 +167,20 @@ contract FranchisaGovernanceRegistryTest is Test {
         registry.registerMeeting(TSLA, "Tesla", block.timestamp, ids, s, s, s, s, s, s);
     }
 
+    function test_registerMeeting_nonSequentialIds_reverts() public {
+        uint8[] memory ids = new uint8[](2);
+        ids[0] = 1;
+        ids[1] = 3; // Gap — should be 2
+
+        string[] memory s = new string[](2);
+        s[0] = "a";
+        s[1] = "b";
+
+        vm.prank(agent);
+        vm.expectRevert("Proposal IDs must be sequential 1..N");
+        registry.registerMeeting(TSLA, "Tesla", block.timestamp, ids, s, s, s, s, s, s);
+    }
+
     function test_submitVote() public {
         _registerTSLAMeeting();
 
@@ -209,6 +228,23 @@ contract FranchisaGovernanceRegistryTest is Test {
         assertFalse(m.isActive);
     }
 
+    function test_closeMeeting_clearsStaleProposals() public {
+        _registerTSLAMeeting();
+
+        // Verify proposals exist
+        FranchisaGovernanceRegistry.Proposal memory p = registry.getProposal(TSLA, 1);
+        assertEq(p.proposalId, 1);
+
+        // Close meeting
+        vm.prank(agent);
+        registry.closeMeeting(TSLA);
+
+        // Stale proposals should be deleted
+        FranchisaGovernanceRegistry.Proposal memory deleted = registry.getProposal(TSLA, 1);
+        assertEq(deleted.proposalId, 0); // default value — deleted
+        assertEq(bytes(deleted.title).length, 0);
+    }
+
     function test_closeMeeting_preventsVoting() public {
         _registerTSLAMeeting();
 
@@ -220,7 +256,7 @@ contract FranchisaGovernanceRegistryTest is Test {
         registry.submitVote(TSLA, 1, 1);
     }
 
-    function test_getActiveMeetingCount() public {
+    function test_getActiveMeetingCount_cached() public {
         _registerTSLAMeeting();
         assertEq(registry.getActiveMeetingCount(), 1);
 
@@ -275,5 +311,83 @@ contract FranchisaGovernanceRegistryTest is Test {
         vm.prank(voter1);
         vm.expectRevert("Stylus vote execution failed");
         registry.submitVote(TSLA, 1, 0); // Try to change to No
+    }
+
+    function test_pause_blocksVoting() public {
+        _registerTSLAMeeting();
+
+        registry.pause();
+
+        vm.prank(voter1);
+        vm.expectRevert(); // EnforcedPause()
+        registry.submitVote(TSLA, 1, 1);
+    }
+
+    function test_unpause_resumesVoting() public {
+        _registerTSLAMeeting();
+
+        registry.pause();
+        registry.unpause();
+
+        vm.prank(voter1);
+        registry.submitVote(TSLA, 1, 1);
+
+        (uint256 yes,,) = registry.getResults(TSLA, 1);
+        assertEq(yes, 1000 * 10 ** 18);
+    }
+
+    // ─── Faucet rate-limit tests ────────────────────────────────────
+
+    function test_faucet_cooldown() public {
+        address claimer = address(0xCCC);
+
+        // Start at a reasonable timestamp (forge default is 1)
+        vm.warp(100_000);
+        token.faucet(claimer, 1000 * 10 ** 18);
+
+        // Second claim immediately should revert
+        vm.expectRevert("Faucet: 24h cooldown between claims");
+        token.faucet(claimer, 1000 * 10 ** 18);
+
+        // After 24h it should work
+        vm.warp(block.timestamp + 24 hours + 1);
+        token.faucet(claimer, 1000 * 10 ** 18);
+        assertEq(token.balanceOf(claimer), 2000 * 10 ** 18);
+    }
+
+    function test_faucet_maxBalance() public {
+        address claimer = address(0xDDD);
+
+        // Start at a reasonable timestamp
+        vm.warp(100_000);
+
+        // Claim multiple times with warp between claims to hit max
+        token.faucet(claimer, 10_000 * 10 ** 18);
+        for (uint256 i = 1; i < 5; i++) {
+            vm.warp(block.timestamp + 24 hours + 1);
+            token.faucet(claimer, 10_000 * 10 ** 18);
+        }
+        assertEq(token.balanceOf(claimer), 50_000 * 10 ** 18);
+
+        // Next claim should revert — at max
+        vm.warp(block.timestamp + 24 hours + 1);
+        vm.expectRevert("Faucet: would exceed max faucet balance of 50,000");
+        token.faucet(claimer, 1000 * 10 ** 18);
+    }
+
+    // ─── Invariant-style check ──────────────────────────────────────
+
+    function test_voteWeightsSumCannotExceedSupply() public {
+        _registerTSLAMeeting();
+
+        vm.prank(voter1);
+        registry.submitVote(TSLA, 1, 1);
+
+        vm.prank(voter2);
+        registry.submitVote(TSLA, 1, 0);
+
+        (uint256 yes, uint256 no, uint256 abstain) = registry.getResults(TSLA, 1);
+        uint256 totalVoteWeight = yes + no + abstain;
+        assertLe(totalVoteWeight, token.totalSupply());
     }
 }

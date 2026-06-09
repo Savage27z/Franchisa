@@ -22,6 +22,7 @@ Franchisa lets holders of tokenized stocks (RWA tokens like mTSLA, mAAPL) partic
 - [Gas Benchmarks](#gas-benchmarks)
 - [Governance Proof](#governance-proof)
 - [Security](#security)
+- [Threat Model — Known Limitations](#threat-model--known-limitations)
 - [Project Structure](#project-structure)
 - [Environment Variables](#environment-variables)
 - [Testing](#testing)
@@ -201,7 +202,7 @@ forge build         # Compile with via-ir
 ### Test
 
 ```bash
-forge test -vv      # Run all 19 tests with verbose output
+forge test -vv      # Run all 26 tests with verbose output
 ```
 
 **Test coverage:**
@@ -411,6 +412,9 @@ User -> Registry (validates token balance) -> Engine (records vote)
 - **Vote casting**: Requires non-zero token balance (checked via IERC20 `balanceOf`)
 - **Engine registry lock**: `onlyOwner` can call `setAuthorizedRegistry` — set once at deployment
 - **Double-vote prevention**: Per-voter per-proposal flag in the engine
+- **Emergency pause**: `Pausable` modifier on both `registerMeeting` and `submitVote` — owner can halt all operations
+- **Reentrancy protection**: `ReentrancyGuard` on `submitVote` — defends against token contracts with transfer hooks (e.g. ERC-777)
+- **Sequential proposal IDs**: `registerMeeting` enforces `proposalIds[i] == i + 1` — prevents phantom proposals from gaps
 
 ### Vote Integrity
 
@@ -418,6 +422,21 @@ User -> Registry (validates token balance) -> Engine (records vote)
 - Choice validation: only 0 (No), 1 (Yes), 2 (Abstain) accepted
 - Proposal ID validation: must match registered proposals
 - Meeting must be active (not closed)
+- Faucet rate-limited: 24h cooldown per address, 50k max balance cap
+
+### Threat Model — Known Limitations
+
+This is a hackathon prototype. The following limitations are acknowledged and would be addressed in production:
+
+| Threat | Status | Production Fix |
+|--------|--------|----------------|
+| **No snapshot voting** | Vote weight reflects balance at tx time, not a fixed block | Use `ERC20Votes` with `getPastVotes(voter, snapshotBlock)` per meeting |
+| **Single-key admin** | Deployer key controls registry, engine swap, agent auth | Multisig owner (Gnosis Safe) + timelock for config changes |
+| **Faucet Sybil** | Rate-limited but attacker can use many EOAs | Production uses real RWA tokens from custodians, no faucet |
+| **Agent key = proof signer** | Same key registers meetings and signs proofs | Separate signing key with HSM; proof signed via EIP-712 typed data |
+| **No governance timelock** | `setStylusEngine` can swap engine mid-meeting | Timelock contract (48h delay) on all admin functions |
+| **EDGAR content injection** | Filing text passed to Claude could contain prompt injection | Schema-validate parsed output with Pydantic; restrict allowed categories |
+| **Token transfer-and-vote** | User votes, transfers tokens to alt, alt votes with same tokens | Snapshot voting eliminates this entirely |
 
 ---
 
@@ -527,28 +546,35 @@ NEXT_PUBLIC_TOKEN_ADDRESS=0x...
 
 ```bash
 cd contracts/solidity
-forge test -vv                    # 19 tests, verbose
+forge test -vv                    # 26 tests, verbose
 forge test --gas-report           # With gas profiling
 forge test --match-contract Auth  # Only auth guard tests
 ```
 
-**Test Suite (19 tests):**
+**Test Suite (26 tests):**
 
 | Test | What It Verifies |
 |------|-----------------|
 | `test_registerMeeting` | Meeting stored correctly with all proposal data |
 | `test_registerMeeting_onlyAgent` | Non-agents cannot register meetings |
+| `test_registerMeeting_nonSequentialIds_reverts` | Proposal IDs must be sequential 1..N |
 | `test_submitVote` | Vote recorded with correct weight |
 | `test_submitVote_noTokens` | Zero-balance wallets rejected |
 | `test_submitVote_invalidChoice` | Choice > 2 reverts |
 | `test_submitVote_invalidProposal` | Non-existent proposal ID reverts |
 | `test_closeMeeting` | Meeting set to inactive |
+| `test_closeMeeting_clearsStaleProposals` | Stale proposal data deleted on close |
 | `test_closeMeeting_preventsVoting` | Votes blocked after close |
-| `test_getActiveMeetingCount` | Counter tracks active meetings |
+| `test_getActiveMeetingCount_cached` | O(1) cached counter tracks active meetings |
 | `test_getProposal` | Individual proposal data retrieval |
 | `test_duplicateMeetingReverts` | Can't register same ticker twice |
 | `test_multipleVoters` | Multiple voters with correct weight aggregation |
 | `test_doubleVotePrevented` | Same voter can't vote twice on same proposal |
+| `test_pause_blocksVoting` | Emergency pause halts all voting |
+| `test_unpause_resumesVoting` | Unpause resumes normal operation |
+| `test_faucet_cooldown` | 24h rate limit on faucet claims |
+| `test_faucet_maxBalance` | 50k token cap on faucet balance |
+| `test_voteWeightsSumCannotExceedSupply` | Total vote weight ≤ token supply (invariant) |
 | `test_ownerCanSetRegistry` | Owner sets authorized registry |
 | `test_nonOwnerCannotSetRegistry` | Non-owner rejected |
 | `test_voteSucceedsFromRegistry` | Registry can cast votes |
