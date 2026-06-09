@@ -1,5 +1,1 @@
-[workspace]
-members = ["."]
-
-[stylus]
-# Arbitrum Stylus contract configuration
+[contract]
