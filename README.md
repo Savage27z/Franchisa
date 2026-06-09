@@ -133,9 +133,9 @@ See [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md) for detailed forge gas report dat
 | Resource | Link |
 |----------|------|
 | Frontend | [franchisa.vercel.app](https://franchisa.vercel.app) |
-| Registry on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0x2497F9f712ed85d5204e53610faa064a17794023) |
+| Registry on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0x648af8CEd63dA3CB014150b543C6e3a2d54c0e37) |
 | Engine on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0x224304493CF93c4ea7ad8904c2A43bcdb808cF2f) |
-| Token on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xcb7eE69ED76b870f1c1ca1420bFBf82A46bDc788) |
+| Token on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b) |
 | mTSLA on Robinhood Chain | [View Contract (Verified)](https://explorer.testnet.chain.robinhood.com/address/0x4956dB7e5604B197C8a44eDb165a6e530C4848C3) |
 
 ---
@@ -144,9 +144,9 @@ See [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md) for detailed forge gas report dat
 
 | Contract | Address | Purpose |
 |----------|---------|---------|
-| **FranchisaGovernanceRegistry** | [`0x2497F9f712ed85d5204e53610faa064a17794023`](https://sepolia.arbiscan.io/address/0x2497F9f712ed85d5204e53610faa064a17794023) | Meeting registration, vote routing, token balance checks |
+| **FranchisaGovernanceRegistry** | [`0x648af8CEd63dA3CB014150b543C6e3a2d54c0e37`](https://sepolia.arbiscan.io/address/0x648af8CEd63dA3CB014150b543C6e3a2d54c0e37) | Meeting registration, vote routing, token balance checks |
 | **MockStylusEngine** | [`0x224304493CF93c4ea7ad8904c2A43bcdb808cF2f`](https://sepolia.arbiscan.io/address/0x224304493CF93c4ea7ad8904c2A43bcdb808cF2f) | Vote storage and aggregation (Solidity stand-in for Stylus) |
-| **MockTokenizedStock (mTSLA)** | [`0xcb7eE69ED76b870f1c1ca1420bFBf82A46bDc788`](https://sepolia.arbiscan.io/address/0xcb7eE69ED76b870f1c1ca1420bFBf82A46bDc788) | ERC-20 tokenized stock with public faucet |
+| **MockTokenizedStock (mTSLA)** | [`0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b`](https://sepolia.arbiscan.io/address/0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b) | ERC-20 tokenized stock with public faucet |
 | **Agent/Deployer** | [`0xD78D1D5Dd356DECc696192D68b2cd046266D3046`](https://sepolia.arbiscan.io/address/0xD78D1D5Dd356DECc696192D68b2cd046266D3046) | Authorized agent that submits proposals |
 
 **Chain**: Arbitrum Sepolia (Chain ID `421614`)
@@ -202,7 +202,7 @@ forge build         # Compile with via-ir
 ### Test
 
 ```bash
-forge test -vv      # Run all 26 tests with verbose output
+forge test -vv      # Run all 32 tests with verbose output
 ```
 
 **Test coverage:**
@@ -409,7 +409,7 @@ User -> Registry (validates token balance) -> Engine (records vote)
 ### Access Control
 
 - **Meeting registration**: `onlyAgent` modifier — only addresses authorized by the contract owner
-- **Vote casting**: Requires non-zero token balance (checked via IERC20 `balanceOf`)
+- **Vote casting**: Requires non-zero voting power at snapshot block (ERC20Votes `getPastVotes`)
 - **Engine registry lock**: `onlyOwner` can call `setAuthorizedRegistry` — set once at deployment
 - **Double-vote prevention**: Per-voter per-proposal flag in the engine
 - **Emergency pause**: `Pausable` modifier on both `registerMeeting` and `submitVote` — owner can halt all operations
@@ -418,11 +418,23 @@ User -> Registry (validates token balance) -> Engine (records vote)
 
 ### Vote Integrity
 
-- Vote weight = token balance at time of voting (no snapshots, real-time)
+- **Snapshot voting**: Vote weight = `getPastVotes(voter, snapshotBlock)` — balance is locked at the block when the meeting was registered, preventing transfer-and-vote attacks
+- **ERC20Votes token**: mTSLA uses OpenZeppelin's `ERC20Votes` with auto-delegation on faucet/mint
+- **Meeting date enforcement**: `require(block.timestamp < meetingDate)` — votes rejected after the meeting date passes
 - Choice validation: only 0 (No), 1 (Yes), 2 (Abstain) accepted
 - Proposal ID validation: must match registered proposals
 - Meeting must be active (not closed)
 - Faucet rate-limited: 24h cooldown per address, 50k max balance cap
+- Ticker deduplication: `registeredTickers` array doesn't grow on re-registration
+
+### Filing Provenance
+
+Each registered meeting stores **verifiable provenance** linking on-chain proposals to the original SEC filing:
+
+- `filingHash` — `keccak256` of the raw DEF 14A filing text from EDGAR
+- `accessionNumber` — SEC EDGAR accession number (e.g. `0001193125-26-150234`)
+
+Anyone can fetch the filing from EDGAR using the accession number, hash it, and verify the proposals were derived from that exact document. This turns the governance proof from "trust the agent" into **verifiable provenance**.
 
 ### Threat Model — Known Limitations
 
@@ -430,13 +442,12 @@ This is a hackathon prototype. The following limitations are acknowledged and wo
 
 | Threat | Status | Production Fix |
 |--------|--------|----------------|
-| **No snapshot voting** | Vote weight reflects balance at tx time, not a fixed block | Use `ERC20Votes` with `getPastVotes(voter, snapshotBlock)` per meeting |
 | **Single-key admin** | Deployer key controls registry, engine swap, agent auth | Multisig owner (Gnosis Safe) + timelock for config changes |
 | **Faucet Sybil** | Rate-limited but attacker can use many EOAs | Production uses real RWA tokens from custodians, no faucet |
 | **Agent key = proof signer** | Same key registers meetings and signs proofs | Separate signing key with HSM; proof signed via EIP-712 typed data |
 | **No governance timelock** | `setStylusEngine` can swap engine mid-meeting | Timelock contract (48h delay) on all admin functions |
 | **EDGAR content injection** | Filing text passed to Claude could contain prompt injection | Schema-validate parsed output with Pydantic; restrict allowed categories |
-| **Token transfer-and-vote** | User votes, transfers tokens to alt, alt votes with same tokens | Snapshot voting eliminates this entirely |
+| **Engine lacks meeting epochs** | Old vote flags leak if same ticker re-registered | Add meetingId to engine storage keys to isolate epochs |
 
 ---
 
@@ -449,9 +460,9 @@ Franchisa/
       src/
         FranchisaGovernanceRegistry.sol   # Central governance registry
         MockStylusEngine.sol              # Voting engine (Solidity stand-in)
-        MockTokenizedStock.sol            # ERC-20 mTSLA with faucet
+        MockTokenizedStock.sol            # ERC20Votes mTSLA with faucet + auto-delegation
       test/
-        FranchisaGovernanceRegistry.t.sol # 13 registry tests
+        FranchisaGovernanceRegistry.t.sol # 26 registry + voting + snapshot tests
         MockStylusEngineAuth.t.sol        # 6 engine auth tests
       script/
         Deploy.s.sol                      # Full deployment script
@@ -546,12 +557,12 @@ NEXT_PUBLIC_TOKEN_ADDRESS=0x...
 
 ```bash
 cd contracts/solidity
-forge test -vv                    # 26 tests, verbose
+forge test -vv                    # 32 tests, verbose
 forge test --gas-report           # With gas profiling
 forge test --match-contract Auth  # Only auth guard tests
 ```
 
-**Test Suite (26 tests):**
+**Test Suite (32 tests):**
 
 | Test | What It Verifies |
 |------|-----------------|
@@ -574,6 +585,12 @@ forge test --match-contract Auth  # Only auth guard tests
 | `test_unpause_resumesVoting` | Unpause resumes normal operation |
 | `test_faucet_cooldown` | 24h rate limit on faucet claims |
 | `test_faucet_maxBalance` | 50k token cap on faucet balance |
+| `test_submitVote_usesSnapshotWeight` | Vote weight from snapshot block, not current balance |
+| `test_submitVote_afterMeetingDate_reverts` | Votes rejected after meeting date passes |
+| `test_registerMeeting_tickerDeduplication` | Re-registering ticker doesn't duplicate in array |
+| `test_faucet_autoDelegates` | Faucet auto-delegates for immediate voting power |
+| `test_filingHash_storedOnChain` | Filing hash and accession number stored in meeting |
+| `test_filingHash_verifiable` | Anyone can reconstruct hash from original filing text |
 | `test_voteWeightsSumCannotExceedSupply` | Total vote weight ≤ token supply (invariant) |
 | `test_ownerCanSetRegistry` | Owner sets authorized registry |
 | `test_nonOwnerCannotSetRegistry` | Non-owner rejected |

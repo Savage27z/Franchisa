@@ -9,14 +9,12 @@ import "../src/MockTokenizedStock.sol";
 ///      Uses a nonce-based approach so each call is treated as a unique voter
 ///      (in production, the Stylus contract uses msg::sender() which is tx.origin).
 contract MockStylusEngine {
-    // nonce => ticker => proposalId => voted (nonce increments per call to simulate different voters)
-    mapping(uint256 => mapping(bytes32 => mapping(uint8 => bool))) public voted;
+    // voter address => ticker => proposalId => voted
+    mapping(address => mapping(bytes32 => mapping(uint8 => bool))) public voted;
     // ticker => proposalId => choice => weight
     mapping(bytes32 => mapping(uint8 => mapping(uint8 => uint256))) public weights;
     // ticker => proposalId => count
     mapping(bytes32 => mapping(uint8 => uint256)) public counts;
-
-    uint256 private _callNonce;
 
     function cast_proxy_vote(
         address voter,
@@ -25,9 +23,8 @@ contract MockStylusEngine {
         uint8 choice,
         uint256 balance
     ) external returns (bool) {
-        // Check double voting using voter address
-        if (voted[uint256(uint160(voter))][ticker][proposalId]) return false;
-        voted[uint256(uint160(voter))][ticker][proposalId] = true;
+        if (voted[voter][ticker][proposalId]) return false;
+        voted[voter][ticker][proposalId] = true;
         if (choice > 2 || balance == 0) return false;
 
         weights[ticker][proposalId][choice] += balance;
@@ -58,7 +55,7 @@ contract MockStylusEngine {
         bytes32 ticker,
         uint8 proposalId
     ) external view returns (bool) {
-        return voted[uint256(uint160(voter))][ticker][proposalId];
+        return voted[voter][ticker][proposalId];
     }
 
     function get_user_vote(
@@ -81,8 +78,14 @@ contract FranchisaGovernanceRegistryTest is Test {
     address public voter2 = address(0xBEEF2);
 
     bytes32 public constant TSLA = bytes32("TSLA");
+    bytes32 public constant FILING_HASH = keccak256("DEF 14A filing text for Tesla Inc 2026");
+    string public constant ACCESSION = "0001193125-26-123456";
 
     function setUp() public {
+        // Start at a reasonable block/timestamp
+        vm.warp(100_000);
+        vm.roll(100);
+
         engine = new MockStylusEngine();
         token = new MockTokenizedStock();
         registry = new FranchisaGovernanceRegistry(
@@ -94,6 +97,7 @@ contract FranchisaGovernanceRegistryTest is Test {
         registry.setAgent(agent, true);
 
         // Give voters some tokens (use owner bulkMint to bypass faucet cooldown)
+        // bulkMint now auto-delegates so getPastVotes will work
         address[] memory recipients = new address[](2);
         recipients[0] = voter1;
         recipients[1] = voter2;
@@ -101,6 +105,9 @@ contract FranchisaGovernanceRegistryTest is Test {
         amounts[0] = 1000 * 10 ** 18;
         amounts[1] = 500 * 10 ** 18;
         token.bulkMint(recipients, amounts);
+
+        // Advance one block so the snapshot (block.number - 1) captures the minted balances
+        vm.roll(block.number + 1);
     }
 
     function _registerTSLAMeeting() internal {
@@ -143,9 +150,13 @@ contract FranchisaGovernanceRegistryTest is Test {
             descriptions,
             riskRatings,
             riskJustifications,
-            boardRecs
+            boardRecs,
+            FILING_HASH,
+            ACCESSION
         );
     }
+
+    // ─── Registration tests ────────────────────────────────────────
 
     function test_registerMeeting() public {
         _registerTSLAMeeting();
@@ -154,6 +165,9 @@ contract FranchisaGovernanceRegistryTest is Test {
         assertEq(m.companyName, "Tesla, Inc.");
         assertTrue(m.isActive);
         assertEq(m.proposalCount, 2);
+        assertEq(m.filingHash, FILING_HASH);
+        assertEq(m.accessionNumber, ACCESSION);
+        assertEq(m.snapshotBlock, block.number - 1);
     }
 
     function test_registerMeeting_onlyAgent() public {
@@ -164,7 +178,7 @@ contract FranchisaGovernanceRegistryTest is Test {
 
         vm.prank(voter1);
         vm.expectRevert("Not authorized agent");
-        registry.registerMeeting(TSLA, "Tesla", block.timestamp, ids, s, s, s, s, s, s);
+        registry.registerMeeting(TSLA, "Tesla", block.timestamp, ids, s, s, s, s, s, s, bytes32(0), "");
     }
 
     function test_registerMeeting_nonSequentialIds_reverts() public {
@@ -178,8 +192,25 @@ contract FranchisaGovernanceRegistryTest is Test {
 
         vm.prank(agent);
         vm.expectRevert("Proposal IDs must be sequential 1..N");
-        registry.registerMeeting(TSLA, "Tesla", block.timestamp, ids, s, s, s, s, s, s);
+        registry.registerMeeting(TSLA, "Tesla", block.timestamp, ids, s, s, s, s, s, s, bytes32(0), "");
     }
+
+    function test_registerMeeting_tickerDeduplication() public {
+        _registerTSLAMeeting();
+        assertEq(registry.getRegisteredTickerCount(), 1);
+
+        // Close and re-register — ticker array should NOT grow
+        vm.prank(agent);
+        registry.closeMeeting(TSLA);
+
+        // Advance block for new snapshot
+        vm.roll(block.number + 1);
+
+        _registerTSLAMeeting();
+        assertEq(registry.getRegisteredTickerCount(), 1); // Still 1, not 2
+    }
+
+    // ─── Voting tests ──────────────────────────────────────────────
 
     function test_submitVote() public {
         _registerTSLAMeeting();
@@ -193,12 +224,27 @@ contract FranchisaGovernanceRegistryTest is Test {
         assertEq(abstain, 0);
     }
 
+    function test_submitVote_usesSnapshotWeight() public {
+        _registerTSLAMeeting();
+
+        // Transfer tokens AFTER registration — vote weight should still be snapshot balance
+        vm.prank(voter1);
+        token.transfer(address(0xDEAD), 500 * 10 ** 18); // voter1 now has 500 tokens
+
+        // But snapshot weight should still be 1000
+        vm.prank(voter1);
+        registry.submitVote(TSLA, 1, 1);
+
+        (uint256 yes,,) = registry.getResults(TSLA, 1);
+        assertEq(yes, 1000 * 10 ** 18); // Snapshot balance, not current
+    }
+
     function test_submitVote_noTokens() public {
         _registerTSLAMeeting();
 
         address noTokens = address(0xDEAD);
         vm.prank(noTokens);
-        vm.expectRevert("Must hold tokenized stock to vote");
+        vm.expectRevert("No voting power at snapshot block");
         registry.submitVote(TSLA, 1, 1);
     }
 
@@ -217,6 +263,19 @@ contract FranchisaGovernanceRegistryTest is Test {
         vm.expectRevert("Invalid proposal ID");
         registry.submitVote(TSLA, 5, 1);
     }
+
+    function test_submitVote_afterMeetingDate_reverts() public {
+        _registerTSLAMeeting();
+
+        // Warp past meeting date
+        vm.warp(block.timestamp + 61 days);
+
+        vm.prank(voter1);
+        vm.expectRevert("Voting closed: meeting date has passed");
+        registry.submitVote(TSLA, 1, 1);
+    }
+
+    // ─── Close meeting tests ───────────────────────────────────────
 
     function test_closeMeeting() public {
         _registerTSLAMeeting();
@@ -283,7 +342,7 @@ contract FranchisaGovernanceRegistryTest is Test {
 
         vm.prank(agent);
         vm.expectRevert("Meeting already active for ticker");
-        registry.registerMeeting(TSLA, "Tesla", block.timestamp, ids, s, s, s, s, s, s);
+        registry.registerMeeting(TSLA, "Tesla", block.timestamp, ids, s, s, s, s, s, s, bytes32(0), "");
     }
 
     function test_multipleVoters() public {
@@ -313,6 +372,8 @@ contract FranchisaGovernanceRegistryTest is Test {
         registry.submitVote(TSLA, 1, 0); // Try to change to No
     }
 
+    // ─── Pause tests ───────────────────────────────────────────────
+
     function test_pause_blocksVoting() public {
         _registerTSLAMeeting();
 
@@ -341,8 +402,6 @@ contract FranchisaGovernanceRegistryTest is Test {
     function test_faucet_cooldown() public {
         address claimer = address(0xCCC);
 
-        // Start at a reasonable timestamp (forge default is 1)
-        vm.warp(100_000);
         token.faucet(claimer, 1000 * 10 ** 18);
 
         // Second claim immediately should revert
@@ -358,13 +417,9 @@ contract FranchisaGovernanceRegistryTest is Test {
     function test_faucet_maxBalance() public {
         address claimer = address(0xDDD);
 
-        // Start at a reasonable timestamp
-        vm.warp(100_000);
-
-        // Claim multiple times with warp between claims to hit max
-        token.faucet(claimer, 10_000 * 10 ** 18);
-        for (uint256 i = 1; i < 5; i++) {
-            vm.warp(block.timestamp + 24 hours + 1);
+        // Claim 5 times (10k each) with 24h warp between claims to hit 50k max
+        for (uint256 i = 0; i < 5; i++) {
+            if (i > 0) vm.warp(block.timestamp + 24 hours + 1);
             token.faucet(claimer, 10_000 * 10 ** 18);
         }
         assertEq(token.balanceOf(claimer), 50_000 * 10 ** 18);
@@ -373,6 +428,38 @@ contract FranchisaGovernanceRegistryTest is Test {
         vm.warp(block.timestamp + 24 hours + 1);
         vm.expectRevert("Faucet: would exceed max faucet balance of 50,000");
         token.faucet(claimer, 1000 * 10 ** 18);
+    }
+
+    function test_faucet_autoDelegates() public {
+        address claimer = address(0xEEE);
+
+        token.faucet(claimer, 1000 * 10 ** 18);
+
+        // Advance block so getPastVotes works
+        vm.roll(block.number + 1);
+
+        // Should have voting power (auto-delegated)
+        uint256 votes = token.getPastVotes(claimer, block.number - 1);
+        assertEq(votes, 1000 * 10 ** 18);
+    }
+
+    // ─── Filing provenance tests ────────────────────────────────────
+
+    function test_filingHash_storedOnChain() public {
+        _registerTSLAMeeting();
+
+        FranchisaGovernanceRegistry.Meeting memory m = registry.getMeeting(TSLA);
+        assertEq(m.filingHash, FILING_HASH);
+        assertEq(m.accessionNumber, ACCESSION);
+    }
+
+    function test_filingHash_verifiable() public {
+        _registerTSLAMeeting();
+
+        // Anyone can reconstruct the hash from the original filing text
+        bytes32 reconstructed = keccak256("DEF 14A filing text for Tesla Inc 2026");
+        FranchisaGovernanceRegistry.Meeting memory m = registry.getMeeting(TSLA);
+        assertEq(m.filingHash, reconstructed);
     }
 
     // ─── Invariant-style check ──────────────────────────────────────

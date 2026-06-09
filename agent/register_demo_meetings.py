@@ -2,11 +2,16 @@
 Register demo meetings on-chain for the Franchisa hackathon demo.
 Uses the deployer key (which is an authorized agent) to register
 multiple company meetings with realistic SEC proxy proposals.
+
+Each meeting includes a keccak256 filing hash and EDGAR accession number
+for verifiable provenance — anyone can fetch the filing, hash it,
+and verify the proposals were derived from that exact document.
 """
 
 import os
 import sys
 import time
+import hashlib
 
 # Add parent dir to path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -34,6 +39,8 @@ REGISTRY_ABI = [
             {"name": "riskRatings", "type": "string[]"},
             {"name": "riskJustifications", "type": "string[]"},
             {"name": "boardRecommendations", "type": "string[]"},
+            {"name": "filingHash", "type": "bytes32"},
+            {"name": "accessionNumber", "type": "string"},
         ],
         "name": "registerMeeting",
         "outputs": [],
@@ -47,11 +54,28 @@ def ticker_to_bytes32(ticker: str) -> bytes:
     return ticker.encode("utf-8").ljust(32, b"\x00")
 
 
+def compute_filing_hash(filing_text: str) -> bytes:
+    """Compute keccak256 hash of filing text, matching Solidity's keccak256."""
+    return Web3.solidity_keccak(["string"], [filing_text])
+
+
+# Demo filing texts — in production these come from real EDGAR DEF 14A filings.
+# Each is a synthetic summary representing the type of content the agent would
+# parse from SEC EDGAR. The hash is stored on-chain for verifiable provenance.
+DEMO_FILING_TEXTS = {
+    "TSLA": "Tesla Inc DEF 14A Proxy Statement FY2026 - Annual Meeting July 18 2026. Proposals: Board Election (11 nominees), Auditor Ratification (PwC), Executive Compensation Advisory Vote, Shareholder Proposal on Lobbying Transparency.",
+    "AAPL": "Apple Inc DEF 14A Proxy Statement FY2026 - Annual Meeting July 8 2026. Proposals: Board Election (8 nominees), 2022 Employee Stock Plan Amendment (+200M shares), Shareholder Proposal on AI Transparency.",
+    "NVDA": "NVIDIA Corporation DEF 14A Proxy Statement FY2026 - Annual Meeting August 2 2026. Proposals: Board Election (13 nominees), Executive Compensation Advisory Vote, Shareholder Proposal on Dual-Class Stock Sunset.",
+    "MSFT": "Microsoft Corporation DEF 14A Proxy Statement FY2026 - Annual Meeting June 30 2026. Proposals: Board Election (12 nominees), Auditor Ratification (Deloitte), Executive Compensation Advisory Vote, Shareholder Proposals on AI Risk and Gender Pay Gap.",
+}
+
+
 DEMO_MEETINGS = [
     {
         "ticker": "TSLA",
         "companyName": "Tesla, Inc.",
         "meetingDate": 1750291200,  # July 18, 2026
+        "accessionNumber": "0001193125-26-150234",  # Synthetic but realistic format
         "proposals": [
             {
                 "proposalId": 1,
@@ -95,6 +119,7 @@ DEMO_MEETINGS = [
         "ticker": "AAPL",
         "companyName": "Apple Inc.",
         "meetingDate": 1749427200,  # July 8, 2026
+        "accessionNumber": "0001193125-26-142567",
         "proposals": [
             {
                 "proposalId": 1,
@@ -129,6 +154,7 @@ DEMO_MEETINGS = [
         "ticker": "NVDA",
         "companyName": "NVIDIA Corporation",
         "meetingDate": 1751500800,  # Aug 2, 2026
+        "accessionNumber": "0001193125-26-163890",
         "proposals": [
             {
                 "proposalId": 1,
@@ -163,6 +189,7 @@ DEMO_MEETINGS = [
         "ticker": "MSFT",
         "companyName": "Microsoft Corporation",
         "meetingDate": 1748822400,  # June 30, 2026
+        "accessionNumber": "0001193125-26-135678",
         "proposals": [
             {
                 "proposalId": 1,
@@ -236,7 +263,14 @@ def main():
         ticker = meeting["ticker"]
         proposals = meeting["proposals"]
 
+        # Compute filing hash from demo filing text
+        filing_text = DEMO_FILING_TEXTS[ticker]
+        filing_hash = compute_filing_hash(filing_text)
+        accession = meeting["accessionNumber"]
+
         print(f"--- Registering {ticker} ({len(proposals)} proposals) ---")
+        print(f"  Filing hash: {filing_hash.hex()}")
+        print(f"  Accession:   {accession}")
 
         # Use EIP-1559 fees
         latest = w3.eth.get_block("latest")
@@ -255,6 +289,8 @@ def main():
             [p["riskRating"] for p in proposals],
             [p["riskJustification"] for p in proposals],
             [p["boardRecommendation"] for p in proposals],
+            filing_hash,
+            accession,
         ).build_transaction(
             {
                 "from": account.address,

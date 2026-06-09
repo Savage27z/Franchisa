@@ -6,6 +6,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+/// @notice Interface for ERC20Votes — getPastVotes for snapshot voting
+interface IERC20Votes {
+    function getPastVotes(address account, uint256 timepoint) external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+}
+
 interface IProxyOracleStylus {
     function cast_proxy_vote(
         address voter,
@@ -56,10 +62,15 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         uint256 registeredAt;
         bool isActive;
         uint8 proposalCount;
+        // ─── Filing provenance (new) ────────────────────────────────
+        bytes32 filingHash;         // keccak256 of the raw DEF 14A filing text
+        string accessionNumber;     // SEC EDGAR accession number (e.g. "0001193125-26-123456")
+        // ─── Snapshot block for vote weight (new) ───────────────────
+        uint256 snapshotBlock;      // block.number at registration — getPastVotes uses this
     }
 
     address public stylusVotingEngine;
-    address public tokenizedAssetRegistry; // Mock RWA ERC-20 token
+    address public tokenizedAssetRegistry; // ERC20Votes token
 
     // ticker (bytes32) => Meeting
     mapping(bytes32 => Meeting) public meetings;
@@ -67,8 +78,11 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
     // ticker (bytes32) => proposalId => Proposal
     mapping(bytes32 => mapping(uint8 => Proposal)) public proposals;
 
-    // List of all registered tickers for enumeration
+    // List of all registered tickers for enumeration (deduplicated)
     bytes32[] public registeredTickers;
+
+    // Track which tickers have been registered (prevents array duplication)
+    mapping(bytes32 => bool) private _tickerRegistered;
 
     // Cached active meeting counter (avoids O(n) loop in view)
     uint256 private _activeMeetingCount;
@@ -80,7 +94,9 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         bytes32 indexed ticker,
         string companyName,
         uint256 meetingDate,
-        uint8 proposalCount
+        uint8 proposalCount,
+        bytes32 filingHash,
+        uint256 snapshotBlock
     );
 
     event ProposalRegistered(
@@ -130,7 +146,7 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         tokenizedAssetRegistry = _registry;
     }
 
-    /// @notice Emergency pause — halts all voting
+    /// @notice Emergency pause — halts all voting and registration
     function pause() external onlyOwner {
         _pause();
     }
@@ -142,6 +158,10 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
 
     // ─── Agent Functions ─────────────────────────────────────────────
 
+    /// @notice Register a shareholder meeting with verifiable filing provenance
+    /// @param filingHash keccak256 hash of the raw DEF 14A filing text from EDGAR.
+    ///        Anyone can fetch the filing, hash it, and verify proposals derived from it.
+    /// @param accessionNumber SEC EDGAR accession number for the filing
     function registerMeeting(
         bytes32 ticker,
         string calldata companyName,
@@ -152,7 +172,9 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         string[] calldata descriptions,
         string[] calldata riskRatings,
         string[] calldata riskJustifications,
-        string[] calldata boardRecommendations
+        string[] calldata boardRecommendations,
+        bytes32 filingHash,
+        string calldata accessionNumber
     ) external onlyAgent whenNotPaused {
         uint256 len = proposalIds.length;
         require(len > 0, "Must include at least one proposal");
@@ -169,13 +191,19 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
             require(proposalIds[i] == i + 1, "Proposal IDs must be sequential 1..N");
         }
 
+        // Snapshot is the PREVIOUS block (current block's votes aren't finalized yet)
+        uint256 snapshot = block.number - 1;
+
         meetings[ticker] = Meeting({
             ticker: ticker,
             companyName: companyName,
             meetingDate: meetingDate,
             registeredAt: block.timestamp,
             isActive: true,
-            proposalCount: uint8(len)
+            proposalCount: uint8(len),
+            filingHash: filingHash,
+            accessionNumber: accessionNumber,
+            snapshotBlock: snapshot
         });
 
         for (uint8 i = 0; i < len; i++) {
@@ -192,14 +220,20 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
             emit ProposalRegistered(ticker, proposalIds[i], titles[i], categories[i]);
         }
 
-        registeredTickers.push(ticker);
+        // Deduplicated ticker array — only push if first time seeing this ticker
+        if (!_tickerRegistered[ticker]) {
+            registeredTickers.push(ticker);
+            _tickerRegistered[ticker] = true;
+        }
         _activeMeetingCount++;
 
         emit MeetingRegistered(
             ticker,
             companyName,
             meetingDate,
-            uint8(len)
+            uint8(len),
+            filingHash,
+            snapshot
         );
     }
 
@@ -210,28 +244,33 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         uint8 proposalId,
         uint8 choice
     ) external whenNotPaused nonReentrant {
-        require(meetings[ticker].isActive, "No active meeting for ticker");
+        Meeting storage m = meetings[ticker];
+        require(m.isActive, "No active meeting for ticker");
+        require(block.timestamp < m.meetingDate, "Voting closed: meeting date has passed");
         require(choice <= 2, "Invalid choice: 0=No, 1=Yes, 2=Abstain");
         require(
-            proposalId > 0 && proposalId <= meetings[ticker].proposalCount,
+            proposalId > 0 && proposalId <= m.proposalCount,
             "Invalid proposal ID"
         );
 
-        uint256 userBalance = IERC20(tokenizedAssetRegistry).balanceOf(
-            msg.sender
+        // Use snapshot voting: weight = balance at registration block
+        // This prevents transfer-and-vote attacks (vote, send tokens to alt, revote)
+        uint256 voteWeight = IERC20Votes(tokenizedAssetRegistry).getPastVotes(
+            msg.sender,
+            m.snapshotBlock
         );
-        require(userBalance > 0, "Must hold tokenized stock to vote");
+        require(voteWeight > 0, "No voting power at snapshot block");
 
         bool success = IProxyOracleStylus(stylusVotingEngine).cast_proxy_vote(
             msg.sender,
             ticker,
             proposalId,
             choice,
-            userBalance
+            voteWeight
         );
         require(success, "Stylus vote execution failed");
 
-        emit VoteSubmitted(msg.sender, ticker, proposalId, choice, userBalance);
+        emit VoteSubmitted(msg.sender, ticker, proposalId, choice, voteWeight);
     }
 
     // ─── Read Functions ──────────────────────────────────────────────
