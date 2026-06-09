@@ -1,0 +1,6 @@
+[stylus]
+# Arbitrum Stylus contract configuration
+# See: https://docs.arbitrum.io/stylus/how-tos/stylus-toml
+
+# Solidity ABI compatibility mode
+abi = "solidity"
