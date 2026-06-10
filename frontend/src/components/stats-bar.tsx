@@ -1,8 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useReadContract } from "wagmi";
-import { REGISTRY_ABI, CONTRACT_ADDRESSES } from "@/lib/contracts";
+import { useReadContract, useReadContracts } from "wagmi";
+import {
+  REGISTRY_ABI,
+  CONTRACT_ADDRESSES,
+  tickerToBytes32,
+} from "@/lib/contracts";
 import { MOCK_MEETINGS } from "@/lib/mock-data";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -24,16 +28,25 @@ export function StatsBar() {
     query: { enabled: isDeployed },
   });
 
+  // Sum real proposal counts from the on-chain meeting headers
+  const { data: headers } = useReadContracts({
+    contracts: MOCK_MEETINGS.map((m) => ({
+      address: registryAddress,
+      abi: REGISTRY_ABI,
+      functionName: "getMeeting" as const,
+      args: [tickerToBytes32(m.ticker)] as const,
+    })),
+    query: { enabled: isDeployed },
+  });
+
   const activeMeetings = onChainCount ? Number(onChainCount) : 0;
   const totalOnChain = tickerCount ? Number(tickerCount) : 0;
 
-  // Only count proposals from on-chain registered meetings
-  const onChainTickers = totalOnChain > 0
-    ? MOCK_MEETINGS.filter((m) =>
-        ["TSLA", "AAPL", "NVDA", "MSFT"].includes(m.ticker.toUpperCase())
-      )
-    : [];
-  const totalProposals = onChainTickers.reduce((acc, m) => acc + m.proposalCount, 0);
+  const totalProposals = (headers ?? []).reduce((acc, r) => {
+    if (r.status !== "success" || !r.result) return acc;
+    const m = r.result as unknown as { isActive: boolean; proposalCount: number };
+    return m.isActive ? acc + Number(m.proposalCount) : acc;
+  }, 0);
 
   const stats = [
     {

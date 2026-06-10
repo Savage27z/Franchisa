@@ -255,7 +255,7 @@ def submit_meeting_onchain(
 
         if receipt["status"] == 1:
             console.print(
-                f"[green]✓ Meeting registered on-chain![/green]\n"
+                f"[green]Meeting registered on-chain![/green]\n"
                 f"  Ticker: {ticker}\n"
                 f"  Proposals: {len(proposals)}\n"
                 f"  Tx: https://sepolia.arbiscan.io/tx/{tx_hash.hex()}\n"

@@ -89,7 +89,9 @@ export function MeetingCard({
                 Voters
               </p>
               <p className="text-sm font-medium text-white/80">
-                {meeting.totalVoters.toLocaleString()}
+                {meeting.totalVoters > 0
+                  ? meeting.totalVoters.toLocaleString()
+                  : "—"}
               </p>
             </div>
           </div>

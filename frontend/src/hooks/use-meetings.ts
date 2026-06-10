@@ -71,15 +71,51 @@ export function useMeetings(): {
   isLoading: boolean;
   isOnChain: boolean;
 } {
+  // Read the on-chain meeting header for every known ticker
+  const { data: headers } = useReadContracts({
+    contracts: MOCK_MEETINGS.map((m) => ({
+      address: registryAddress,
+      abi: REGISTRY_ABI,
+      functionName: "getMeeting" as const,
+      args: [tickerToBytes32(m.ticker)] as const,
+    })),
+    query: { enabled: isDeployed },
+  });
+
   // If contracts not deployed, use pure mock data
   if (!isDeployed) {
     return { meetings: MOCK_MEETINGS, isLoading: false, isOnChain: false };
   }
 
-  // Use mock data but mark as potentially on-chain
-  // The individual meeting pages will pull real on-chain data for voting
+  // Merge on-chain headers (company name, dates, counts, status) over the
+  // mock entries; detail pages fetch full proposal metadata from chain.
+  const meetings = MOCK_MEETINGS.map((mock, i) => {
+    const result = headers?.[i];
+    if (result?.status !== "success" || !result.result) return mock;
+    const m = result.result as unknown as {
+      companyName: string;
+      meetingDate: bigint;
+      registeredAt: bigint;
+      isActive: boolean;
+      proposalCount: number;
+    };
+    if (!m.companyName) return mock;
+    return {
+      ...mock,
+      companyName: m.companyName,
+      meetingDate: new Date(Number(m.meetingDate) * 1000)
+        .toISOString()
+        .split("T")[0],
+      registeredAt: new Date(Number(m.registeredAt) * 1000)
+        .toISOString()
+        .split("T")[0],
+      isActive: m.isActive,
+      proposalCount: m.proposalCount,
+    };
+  });
+
   return {
-    meetings: MOCK_MEETINGS,
+    meetings,
     isLoading: false,
     isOnChain: true,
   };
@@ -114,11 +150,47 @@ export function useMeetingDetail(ticker: string) {
     | undefined;
 
   const hasOnChainData = meeting && meeting.companyName !== "";
+  const onChainCount = hasOnChainData ? meeting.proposalCount : 0;
+
+  // Fetch the real proposal metadata from the registry
+  const { data: proposalData, isLoading: proposalsLoading } =
+    useOnChainProposals(ticker, onChainCount);
 
   // Get mock data as fallback
   const mockMeeting = MOCK_MEETINGS.find(
     (m) => m.ticker.toLowerCase() === ticker.toLowerCase()
   );
+
+  type OnChainProposal = {
+    proposalId: number;
+    title: string;
+    category: string;
+    description: string;
+    riskRating: string;
+    riskJustification: string;
+    boardRecommendation: string;
+  };
+
+  const onChainProposals: Proposal[] =
+    proposalData
+      ?.filter((r) => r.status === "success" && r.result)
+      .map((r) => {
+        const p = r.result as unknown as OnChainProposal;
+        return {
+          proposalId: Number(p.proposalId),
+          title: p.title,
+          category: p.category,
+          description: p.description,
+          riskRating: p.riskRating as Proposal["riskRating"],
+          riskJustification: p.riskJustification,
+          boardRecommendation:
+            p.boardRecommendation as Proposal["boardRecommendation"],
+          yesWeight: 0n,
+          noWeight: 0n,
+          abstainWeight: 0n,
+          voterCount: 0,
+        };
+      }) ?? [];
 
   return {
     meeting: hasOnChainData
@@ -133,12 +205,15 @@ export function useMeetingDetail(ticker: string) {
           ).toISOString().split("T")[0],
           isActive: meeting.isActive,
           proposalCount: meeting.proposalCount,
-          proposals: mockMeeting?.proposals ?? [],
+          proposals:
+            onChainProposals.length > 0
+              ? onChainProposals
+              : mockMeeting?.proposals ?? [],
           totalVoters: mockMeeting?.totalVoters ?? 0,
         }
       : mockMeeting ?? null,
     isOnChain: !!hasOnChainData,
-    isLoading: meetingLoading,
+    isLoading: meetingLoading || proposalsLoading,
     proposalCount: hasOnChainData
       ? meeting.proposalCount
       : mockMeeting?.proposalCount ?? 0,

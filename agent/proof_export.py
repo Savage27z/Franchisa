@@ -1,4 +1,4 @@
-"""
+﻿"""
 Component D: Governance Proof Export
 
 Queries the on-chain Stylus voting engine for final results,

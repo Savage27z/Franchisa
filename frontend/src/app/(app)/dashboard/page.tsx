@@ -90,7 +90,8 @@ export default function DashboardPage() {
         isActive: m.isActive,
         proposalCount: m.proposalCount,
         proposals: mockMatch?.proposals ?? [],
-        totalVoters: mockMatch?.totalVoters ?? 0,
+        // Real voter counts are read per-proposal on the detail page
+        totalVoters: 0,
       } satisfies Meeting;
     })
     .filter(Boolean) as Meeting[];
