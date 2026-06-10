@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "export-abi"), no_main)]
+﻿#![cfg_attr(not(feature = "export-abi"), no_main)]
 extern crate alloc;
 
 use stylus_sdk::{
@@ -6,7 +6,7 @@ use stylus_sdk::{
     storage::{StorageAddress, StorageMap, StorageU256},
     msg,
 };
-use alloy_primitives::{Address, U256};
+use alloy_primitives::{Address, FixedBytes, U256};
 
 #[storage]
 #[entrypoint]
@@ -19,19 +19,19 @@ pub struct ProxyOracle {
     pub owner: StorageAddress,
 
     /// user_address => ticker => meeting_id => proposal_id(U256) => has_voted (1=true, 0=false)
-    pub has_voted: StorageMap<Address, StorageMap<[u8; 32], StorageMap<U256, StorageMap<U256, StorageU256>>>>,
+    pub has_voted: StorageMap<Address, StorageMap<FixedBytes<32>, StorageMap<U256, StorageMap<U256, StorageU256>>>>,
 
     /// user_address => ticker => meeting_id => proposal_id(U256) => choice (stored as U256)
-    pub user_choices: StorageMap<Address, StorageMap<[u8; 32], StorageMap<U256, StorageMap<U256, StorageU256>>>>,
+    pub user_choices: StorageMap<Address, StorageMap<FixedBytes<32>, StorageMap<U256, StorageMap<U256, StorageU256>>>>,
 
     /// user_address => ticker => meeting_id => proposal_id(U256) => weight
-    pub user_weights: StorageMap<Address, StorageMap<[u8; 32], StorageMap<U256, StorageMap<U256, StorageU256>>>>,
+    pub user_weights: StorageMap<Address, StorageMap<FixedBytes<32>, StorageMap<U256, StorageMap<U256, StorageU256>>>>,
 
     /// ticker => meeting_id => proposal_id(U256) => choice(U256) => total_weight
-    pub total_weights: StorageMap<[u8; 32], StorageMap<U256, StorageMap<U256, StorageMap<U256, StorageU256>>>>,
+    pub total_weights: StorageMap<FixedBytes<32>, StorageMap<U256, StorageMap<U256, StorageMap<U256, StorageU256>>>>,
 
     /// ticker => meeting_id => proposal_id(U256) => voter_count
-    pub voter_count: StorageMap<[u8; 32], StorageMap<U256, StorageMap<U256, StorageU256>>>,
+    pub voter_count: StorageMap<FixedBytes<32>, StorageMap<U256, StorageMap<U256, StorageU256>>>,
 }
 
 #[public]
@@ -57,14 +57,14 @@ impl ProxyOracle {
     /// NOT the EOA. We enforce that only the registry can call this function, and the
     /// registry passes the real voter address as a parameter after verifying their token balance.
     ///
-    /// meeting_id: Epoch identifier — isolates vote storage per meeting cycle so closing
+    /// meeting_id: Epoch identifier - isolates vote storage per meeting cycle so closing
     ///             and re-registering the same ticker starts with a clean slate.
     /// choice: 0 = No, 1 = Yes, 2 = Abstain
     /// token_balance: the user's tokenized stock balance, used as vote weight
     pub fn cast_proxy_vote(
         &mut self,
         voter: Address,
-        ticker: [u8; 32],
+        ticker: FixedBytes<32>,
         meeting_id: U256,
         proposal_id: U256,
         choice: U256,
@@ -122,7 +122,7 @@ impl ProxyOracle {
     /// Returns (yes_weight, no_weight, abstain_weight)
     pub fn compile_final_results(
         &self,
-        ticker: [u8; 32],
+        ticker: FixedBytes<32>,
         meeting_id: U256,
         proposal_id: U256,
     ) -> (U256, U256, U256) {
@@ -133,12 +133,12 @@ impl ProxyOracle {
     }
 
     /// Returns the total number of unique voters for a proposal
-    pub fn get_voter_count(&self, ticker: [u8; 32], meeting_id: U256, proposal_id: U256) -> U256 {
+    pub fn get_voter_count(&self, ticker: FixedBytes<32>, meeting_id: U256, proposal_id: U256) -> U256 {
         self.voter_count.getter(ticker).getter(meeting_id).get(proposal_id)
     }
 
     /// Checks if a specific address has voted on a proposal
-    pub fn has_user_voted(&self, voter: Address, ticker: [u8; 32], meeting_id: U256, proposal_id: U256) -> bool {
+    pub fn has_user_voted(&self, voter: Address, ticker: FixedBytes<32>, meeting_id: U256, proposal_id: U256) -> bool {
         self.has_voted.getter(voter).getter(ticker).getter(meeting_id).get(proposal_id) != U256::ZERO
     }
 
@@ -146,7 +146,7 @@ impl ProxyOracle {
     pub fn get_user_vote(
         &self,
         voter: Address,
-        ticker: [u8; 32],
+        ticker: FixedBytes<32>,
         meeting_id: U256,
         proposal_id: U256,
     ) -> (U256, U256) {
