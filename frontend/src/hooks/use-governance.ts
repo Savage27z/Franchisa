@@ -32,7 +32,7 @@ function useEnsureArbitrumSepolia() {
  * Hook to submit a vote on-chain via the FranchisaGovernanceRegistry.
  */
 export function useSubmitVote() {
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const ensureChain = useEnsureArbitrumSepolia();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -40,6 +40,7 @@ export function useSubmitVote() {
   });
 
   const submitVote = async (ticker: string, proposalId: number, choice: number) => {
+    reset(); // clear any stale error from a previous attempt
     try {
       await ensureChain();
     } catch {
@@ -145,7 +146,7 @@ export function useTokenBalance() {
  */
 export function useFaucet() {
   const { address } = useAccount();
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { writeContract, data: hash, isPending, error, reset } = useWriteContract();
   const ensureChain = useEnsureArbitrumSepolia();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -154,6 +155,7 @@ export function useFaucet() {
 
   const claimTokens = async (amount: bigint = BigInt("1000000000000000000000")) => {
     if (!address) return;
+    reset(); // clear any stale error from a previous attempt
     try {
       await ensureChain();
     } catch {
