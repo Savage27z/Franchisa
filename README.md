@@ -133,8 +133,8 @@ See [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md) for detailed forge gas report dat
 | Resource | Link |
 |----------|------|
 | Frontend | [franchisa.vercel.app](https://franchisa.vercel.app) |
-| Registry on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xca55b1c8ce1d15109417Db6f3D987C8B903F9f45) |
-| Engine on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xF7D8891eB22Be860c2F666CcBFB2D81d28229aa1) |
+| Registry on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xe873D942cB0aF313AE664A88bc918A1aD606B946) |
+| Engine on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0x5f4a788b9614b1177b7a75b5645aa955f6af82e1) |
 | Token on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b) |
 | mTSLA on Robinhood Chain | [View Contract (Verified)](https://explorer.testnet.chain.robinhood.com/address/0x4956dB7e5604B197C8a44eDb165a6e530C4848C3) |
 
@@ -144,8 +144,8 @@ See [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md) for detailed forge gas report dat
 
 | Contract | Address | Purpose |
 |----------|---------|---------|
-| **FranchisaGovernanceRegistry** | [`0xca55b1c8ce1d15109417Db6f3D987C8B903F9f45`](https://sepolia.arbiscan.io/address/0xca55b1c8ce1d15109417Db6f3D987C8B903F9f45) | Meeting registration, vote routing, token balance checks |
-| **MockStylusEngine** | [`0xF7D8891eB22Be860c2F666CcBFB2D81d28229aa1`](https://sepolia.arbiscan.io/address/0xF7D8891eB22Be860c2F666CcBFB2D81d28229aa1) | Vote storage and aggregation (Solidity stand-in for Stylus) |
+| **FranchisaGovernanceRegistry** | [`0xe873D942cB0aF313AE664A88bc918A1aD606B946`](https://sepolia.arbiscan.io/address/0xe873D942cB0aF313AE664A88bc918A1aD606B946) | Meeting registration, vote routing, token balance checks |
+| **MockStylusEngine** | [`0x5f4a788b9614b1177b7a75b5645aa955f6af82e1`](https://sepolia.arbiscan.io/address/0x5f4a788b9614b1177b7a75b5645aa955f6af82e1) | Vote storage and aggregation (Solidity stand-in for Stylus) |
 | **MockTokenizedStock (mTSLA)** | [`0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b`](https://sepolia.arbiscan.io/address/0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b) | ERC-20 tokenized stock with public faucet |
 | **Agent/Deployer** | [`0xD78D1D5Dd356DECc696192D68b2cd046266D3046`](https://sepolia.arbiscan.io/address/0xD78D1D5Dd356DECc696192D68b2cd046266D3046) | Authorized agent that submits proposals |
 

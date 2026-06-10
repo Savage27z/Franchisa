@@ -14,8 +14,8 @@ Franchisa generates cryptographic governance proofs — signed attestations that
   "chain": {
     "network": "arbitrum-sepolia",
     "chainId": 421614,
-    "registryContract": "0xca55b1c8ce1d15109417Db6f3D987C8B903F9f45",
-    "stylusEngine": "0xF7D8891eB22Be860c2F666CcBFB2D81d28229aa1",
+    "registryContract": "0xe873D942cB0aF313AE664A88bc918A1aD606B946",
+    "stylusEngine": "0x5f4a788b9614b1177b7a75b5645aa955f6af82e1",
     "tokenContract": "0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b"
   },
   "meeting": {

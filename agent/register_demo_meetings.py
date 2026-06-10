@@ -74,7 +74,7 @@ DEMO_MEETINGS = [
     {
         "ticker": "TSLA",
         "companyName": "Tesla, Inc.",
-        "meetingDate": 1750291200,  # July 18, 2026
+        "meetingDate": 1784332800,  # July 18, 2026
         "accessionNumber": "0001193125-26-150234",  # Synthetic but realistic format
         "proposals": [
             {
@@ -118,7 +118,7 @@ DEMO_MEETINGS = [
     {
         "ticker": "AAPL",
         "companyName": "Apple Inc.",
-        "meetingDate": 1749427200,  # July 8, 2026
+        "meetingDate": 1783468800,  # July 8, 2026
         "accessionNumber": "0001193125-26-142567",
         "proposals": [
             {
@@ -153,7 +153,7 @@ DEMO_MEETINGS = [
     {
         "ticker": "NVDA",
         "companyName": "NVIDIA Corporation",
-        "meetingDate": 1751500800,  # Aug 2, 2026
+        "meetingDate": 1785628800,  # Aug 2, 2026
         "accessionNumber": "0001193125-26-163890",
         "proposals": [
             {
@@ -188,7 +188,7 @@ DEMO_MEETINGS = [
     {
         "ticker": "MSFT",
         "companyName": "Microsoft Corporation",
-        "meetingDate": 1748822400,  # June 30, 2026
+        "meetingDate": 1782777600,  # June 30, 2026
         "accessionNumber": "0001193125-26-135678",
         "proposals": [
             {

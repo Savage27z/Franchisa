@@ -13,7 +13,7 @@ interface IERC20Votes {
 }
 
 interface IProxyOracleStylus {
-    function cast_proxy_vote(
+    function castProxyVote(
         address voter,
         bytes32 ticker,
         uint256 meetingId,
@@ -22,26 +22,26 @@ interface IProxyOracleStylus {
         uint256 balance
     ) external returns (bool);
 
-    function compile_final_results(
+    function compileFinalResults(
         bytes32 ticker,
         uint256 meetingId,
         uint256 proposalId
     ) external view returns (uint256, uint256, uint256);
 
-    function get_voter_count(
+    function getVoterCount(
         bytes32 ticker,
         uint256 meetingId,
         uint256 proposalId
     ) external view returns (uint256);
 
-    function has_user_voted(
+    function hasUserVoted(
         address voter,
         bytes32 ticker,
         uint256 meetingId,
         uint256 proposalId
     ) external view returns (bool);
 
-    function get_user_vote(
+    function getUserVote(
         address voter,
         bytes32 ticker,
         uint256 meetingId,
@@ -276,7 +276,7 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
         );
         require(voteWeight > 0, "No voting power at snapshot block");
 
-        bool success = IProxyOracleStylus(stylusVotingEngine).cast_proxy_vote(
+        bool success = IProxyOracleStylus(stylusVotingEngine).castProxyVote(
             msg.sender,
             ticker,
             m.meetingId,
@@ -297,7 +297,7 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
     ) external view returns (uint256 yes, uint256 no, uint256 abstain) {
         uint256 mid = meetings[ticker].meetingId;
         return
-            IProxyOracleStylus(stylusVotingEngine).compile_final_results(
+            IProxyOracleStylus(stylusVotingEngine).compileFinalResults(
                 ticker,
                 mid,
                 proposalId
@@ -310,7 +310,7 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
     ) external view returns (uint256) {
         uint256 mid = meetings[ticker].meetingId;
         return
-            IProxyOracleStylus(stylusVotingEngine).get_voter_count(
+            IProxyOracleStylus(stylusVotingEngine).getVoterCount(
                 ticker,
                 mid,
                 proposalId
@@ -324,7 +324,7 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
     ) external view returns (bool) {
         uint256 mid = meetings[ticker].meetingId;
         return
-            IProxyOracleStylus(stylusVotingEngine).has_user_voted(
+            IProxyOracleStylus(stylusVotingEngine).hasUserVoted(
                 voter,
                 ticker,
                 mid,
@@ -339,7 +339,7 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
     ) external view returns (uint256 choice, uint256 weight) {
         uint256 mid = meetings[ticker].meetingId;
         return
-            IProxyOracleStylus(stylusVotingEngine).get_user_vote(
+            IProxyOracleStylus(stylusVotingEngine).getUserVote(
                 voter,
                 ticker,
                 mid,
