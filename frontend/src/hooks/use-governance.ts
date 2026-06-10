@@ -6,7 +6,6 @@ import {
   useWaitForTransactionReceipt,
   useAccount,
   useSwitchChain,
-  useChainId,
 } from "wagmi";
 import { arbitrumSepolia } from "wagmi/chains";
 import { REGISTRY_ABI, MOCK_TOKEN_ABI, CONTRACT_ADDRESSES, tickerToBytes32 } from "@/lib/contracts";
@@ -16,11 +15,14 @@ import { REGISTRY_ABI, MOCK_TOKEN_ABI, CONTRACT_ADDRESSES, tickerToBytes32 } fro
  * prompting the wallet to switch (and add the network) if needed.
  */
 function useEnsureArbitrumSepolia() {
-  const chainId = useChainId();
+  // useAccount().chainId is the wallet's ACTUAL chain (undefined if the
+  // wallet is on a network outside the app config). useChainId() would
+  // only return the app's configured chain and miss the mismatch.
+  const { chainId: walletChainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
 
   return async () => {
-    if (chainId !== arbitrumSepolia.id) {
+    if (walletChainId !== arbitrumSepolia.id) {
       await switchChainAsync({ chainId: arbitrumSepolia.id });
     }
   };
