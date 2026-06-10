@@ -1,20 +1,48 @@
 ﻿"use client";
 
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
+import {
+  useReadContract,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  useAccount,
+  useSwitchChain,
+  useChainId,
+} from "wagmi";
 import { arbitrumSepolia } from "wagmi/chains";
 import { REGISTRY_ABI, MOCK_TOKEN_ABI, CONTRACT_ADDRESSES, tickerToBytes32 } from "@/lib/contracts";
+
+/**
+ * Hook that ensures the wallet is on Arbitrum Sepolia before a write,
+ * prompting the wallet to switch (and add the network) if needed.
+ */
+function useEnsureArbitrumSepolia() {
+  const chainId = useChainId();
+  const { switchChainAsync } = useSwitchChain();
+
+  return async () => {
+    if (chainId !== arbitrumSepolia.id) {
+      await switchChainAsync({ chainId: arbitrumSepolia.id });
+    }
+  };
+}
 
 /**
  * Hook to submit a vote on-chain via the FranchisaGovernanceRegistry.
  */
 export function useSubmitVote() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const ensureChain = useEnsureArbitrumSepolia();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
 
-  const submitVote = (ticker: string, proposalId: number, choice: number) => {
+  const submitVote = async (ticker: string, proposalId: number, choice: number) => {
+    try {
+      await ensureChain();
+    } catch {
+      return; // user declined the network switch
+    }
     writeContract({
       address: CONTRACT_ADDRESSES.registry as `0x${string}`,
       chainId: arbitrumSepolia.id,
@@ -116,13 +144,19 @@ export function useTokenBalance() {
 export function useFaucet() {
   const { address } = useAccount();
   const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const ensureChain = useEnsureArbitrumSepolia();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
   });
 
-  const claimTokens = (amount: bigint = BigInt("1000000000000000000000")) => {
+  const claimTokens = async (amount: bigint = BigInt("1000000000000000000000")) => {
     if (!address) return;
+    try {
+      await ensureChain();
+    } catch {
+      return; // user declined the network switch
+    }
     writeContract({
       address: CONTRACT_ADDRESSES.mockToken as `0x${string}`,
       chainId: arbitrumSepolia.id,
