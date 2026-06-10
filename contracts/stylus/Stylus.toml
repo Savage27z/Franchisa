@@ -1,1 +1,5 @@
-[contract]
+[workspace]
+networks = {}
+
+[workspace.contracts.franchisa-proxy-oracle]
+path = "."
