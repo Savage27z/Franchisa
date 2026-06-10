@@ -42,6 +42,7 @@ jobs:
             --endpoint https://sepolia-rollup.arbitrum.io/rpc \
             --private-key ${{ secrets.DEPLOYER_PRIVATE_KEY }} \
             --no-verify \
+            --max-fee-per-gas-gwei 1 \
             2>&1 | tee deploy-output.txt
 
           # Extract deployed address (strip ANSI color codes first)
