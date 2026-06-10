@@ -268,12 +268,7 @@ export default function ProfilePage() {
         transition={{ duration: 0.3, delay: 0.1 }}
         className="mb-10"
       >
-        <div className="flex items-baseline justify-between mb-4">
-          <p className="text-sm text-muted-foreground">Token Holdings</p>
-          <p className="text-[10px] text-muted-foreground/50">
-            Virtual reference prices — testnet display only
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground mb-4">Token Holdings</p>
         <div className="space-y-2">
           {holdings.map((h) => (
             <div

@@ -95,25 +95,28 @@ export function ProposalCard({
   const [localVote, setLocalVote] = useState<string | null>(
     proposal.userVoted ?? null
   );
+  const [pendingChoice, setPendingChoice] = useState<string | null>(null);
 
   const hasVoted = onChainHasVoted || !!localVote;
 
-  // Refetch results after successful vote
+  // Record the vote and refetch results only once the tx actually confirms —
+  // a rejected signature or reverted tx must not lock the buttons.
   useEffect(() => {
     if (voteSuccess) {
+      if (pendingChoice) setLocalVote(pendingChoice);
       refetchResults();
     }
-  }, [voteSuccess, refetchResults]);
+  }, [voteSuccess, pendingChoice, refetchResults]);
 
   const handleVote = async (choice: "yes" | "no" | "abstain") => {
     // Require wallet connection — voting always requires a signed transaction
     if (!isConnected) return;
     if (!ticker) return;
 
-    // On-chain vote: 0=No, 1=Yes, 2=Abstain — triggers MetaMask signature
+    // On-chain vote: 0=No, 1=Yes, 2=Abstain — triggers wallet signature
     const choiceMap = { yes: 1, no: 0, abstain: 2 };
+    setPendingChoice(choice);
     submitVote(ticker, proposal.proposalId, choiceMap[choice]);
-    setLocalVote(choice);
   };
 
   const isVoting = isVotePending || isConfirming;
@@ -276,8 +279,8 @@ export function ProposalCard({
                   <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10">
                     <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                     <span className="text-xs text-amber-400">
-                      You need mTSLA tokens to vote. Visit the Faucet page to
-                      claim tokens.
+                      You need {tickerToken?.symbol ?? "this company's"} tokens
+                      to vote. Visit the Faucet page to claim them.
                     </span>
                   </div>
                 ) : (
