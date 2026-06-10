@@ -25,7 +25,9 @@ REGISTRY_ABI = json.loads("""[
             {"internalType": "string[]", "name": "descriptions", "type": "string[]"},
             {"internalType": "string[]", "name": "riskRatings", "type": "string[]"},
             {"internalType": "string[]", "name": "riskJustifications", "type": "string[]"},
-            {"internalType": "string[]", "name": "boardRecommendations", "type": "string[]"}
+            {"internalType": "string[]", "name": "boardRecommendations", "type": "string[]"},
+            {"internalType": "bytes32", "name": "filingHash", "type": "bytes32"},
+            {"internalType": "string", "name": "accessionNumber", "type": "string"}
         ],
         "name": "registerMeeting",
         "outputs": [],
@@ -45,7 +47,11 @@ REGISTRY_ABI = json.loads("""[
                     {"internalType": "uint256", "name": "meetingDate", "type": "uint256"},
                     {"internalType": "uint256", "name": "registeredAt", "type": "uint256"},
                     {"internalType": "bool", "name": "isActive", "type": "bool"},
-                    {"internalType": "uint8", "name": "proposalCount", "type": "uint8"}
+                    {"internalType": "uint8", "name": "proposalCount", "type": "uint8"},
+                    {"internalType": "bytes32", "name": "filingHash", "type": "bytes32"},
+                    {"internalType": "string", "name": "accessionNumber", "type": "string"},
+                    {"internalType": "uint256", "name": "snapshotBlock", "type": "uint256"},
+                    {"internalType": "uint256", "name": "meetingId", "type": "uint256"}
                 ],
                 "internalType": "struct FranchisaGovernanceRegistry.Meeting",
                 "name": "",
@@ -197,6 +203,11 @@ def submit_meeting_onchain(
         risk_justifications = [p["riskJustification"] for p in proposals]
         board_recs = [p["boardRecommendation"] for p in proposals]
 
+        # Filing provenance — hash + accession from EDGAR (zero hash if absent)
+        filing_hash_hex = parsed_data.get("filingHash") or "00" * 32
+        filing_hash = bytes.fromhex(filing_hash_hex.removeprefix("0x"))
+        accession_number = parsed_data.get("accessionNumber", "")
+
         # Build transaction with EIP-1559 fees
         nonce = w3.eth.get_transaction_count(account.address)
         latest_block = w3.eth.get_block("latest")
@@ -215,6 +226,8 @@ def submit_meeting_onchain(
             risk_ratings,
             risk_justifications,
             board_recs,
+            filing_hash,
+            accession_number,
         ).build_transaction(
             {
                 "from": account.address,

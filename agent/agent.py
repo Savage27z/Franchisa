@@ -233,12 +233,16 @@ def _run_agentic_loop(state: AgentState, ticker: str, demo: bool, submit: bool, 
         state.log("Synthetic TSLA annual meeting filing loaded (4 proposals)")
     else:
         state.log(f"Querying SEC EDGAR for DEF 14A filings...")
-        from edgar import search_filings, fetch_filing_text
+        from edgar import fetch_latest_filing
 
-        filings = search_filings(ticker, filing_type="DEF 14A")
-        if filings:
-            state.log(f"Found {len(filings)} filing(s) for {ticker}")
-            filing_text = fetch_filing_text(ticker)
+        filing_info = fetch_latest_filing(ticker)
+        if filing_info:
+            state.log(
+                f"Latest DEF 14A: {filing_info['accession_number']} "
+                f"filed {filing_info['filing_date']}"
+            )
+            state.log(f"Filing hash (keccak256): {filing_info['filing_hash']}")
+            filing_text = filing_info["text"]
         else:
             state.log(f"No DEF 14A filings found for {ticker}")
             filing_text = None
@@ -321,6 +325,13 @@ def _run_agentic_loop(state: AgentState, ticker: str, demo: bool, submit: bool, 
     if not parsed:
         state.error(f"Failed to parse filing for {ticker}")
         return
+
+    # Attach filing provenance for on-chain verification
+    if not demo and filing_info:
+        parsed["filingHash"] = filing_info["filing_hash"]
+        parsed["accessionNumber"] = filing_info["accession_number"]
+        parsed["documentUrl"] = filing_info["document_url"]
+        state.log(f"Provenance attached: {filing_info['accession_number']}")
 
     state.proposals_found = len(parsed["proposals"])
     state.log(f"Extracted {state.proposals_found} proposals for {parsed['companyName']}")
