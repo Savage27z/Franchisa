@@ -3,7 +3,7 @@ extern crate alloc;
 
 use stylus_sdk::{
     prelude::*,
-    storage::{StorageAddress, StorageMap, StorageU256, StorageBool, StorageU8},
+    storage::{StorageAddress, StorageMap, StorageU256, StorageBool},
     msg,
 };
 use alloy_primitives::{Address, U256};
@@ -21,8 +21,8 @@ pub struct ProxyOracle {
     /// user_address => ticker => meeting_id => proposal_id => has_voted
     pub has_voted: StorageMap<Address, StorageMap<[u8; 32], StorageMap<U256, StorageMap<u8, StorageBool>>>>,
 
-    /// user_address => ticker => meeting_id => proposal_id => choice
-    pub user_choices: StorageMap<Address, StorageMap<[u8; 32], StorageMap<U256, StorageMap<u8, StorageU8>>>>,
+    /// user_address => ticker => meeting_id => proposal_id => choice (stored as U256)
+    pub user_choices: StorageMap<Address, StorageMap<[u8; 32], StorageMap<U256, StorageMap<u8, StorageU256>>>>,
 
     /// user_address => ticker => meeting_id => proposal_id => weight
     pub user_weights: StorageMap<Address, StorageMap<[u8; 32], StorageMap<U256, StorageMap<u8, StorageU256>>>>,
@@ -97,7 +97,7 @@ impl ProxyOracle {
 
         // Record the vote
         self.has_voted.setter(voter).setter(ticker).setter(meeting_id).insert(proposal_id, true);
-        self.user_choices.setter(voter).setter(ticker).setter(meeting_id).insert(proposal_id, choice);
+        self.user_choices.setter(voter).setter(ticker).setter(meeting_id).insert(proposal_id, U256::from(choice));
         self.user_weights.setter(voter).setter(ticker).setter(meeting_id).insert(proposal_id, token_balance);
 
         // Update aggregated totals
@@ -126,9 +126,9 @@ impl ProxyOracle {
         meeting_id: U256,
         proposal_id: u8,
     ) -> (U256, U256, U256) {
-        let yes = self.total_weights.getter(ticker).getter(meeting_id).getter(proposal_id).get(1);
-        let no = self.total_weights.getter(ticker).getter(meeting_id).getter(proposal_id).get(0);
-        let abstain = self.total_weights.getter(ticker).getter(meeting_id).getter(proposal_id).get(2);
+        let yes = self.total_weights.getter(ticker).getter(meeting_id).getter(proposal_id).get(1u8);
+        let no = self.total_weights.getter(ticker).getter(meeting_id).getter(proposal_id).get(0u8);
+        let abstain = self.total_weights.getter(ticker).getter(meeting_id).getter(proposal_id).get(2u8);
         (yes, no, abstain)
     }
 
@@ -142,14 +142,14 @@ impl ProxyOracle {
         self.has_voted.getter(voter).getter(ticker).getter(meeting_id).get(proposal_id)
     }
 
-    /// Returns a user's vote details (choice, weight) for a specific proposal
+    /// Returns a user's vote details (choice as U256, weight) for a specific proposal
     pub fn get_user_vote(
         &self,
         voter: Address,
         ticker: [u8; 32],
         meeting_id: U256,
         proposal_id: u8,
-    ) -> (u8, U256) {
+    ) -> (U256, U256) {
         let choice = self.user_choices.getter(voter).getter(ticker).getter(meeting_id).get(proposal_id);
         let weight = self.user_weights.getter(voter).getter(ticker).getter(meeting_id).get(proposal_id);
         (choice, weight)
