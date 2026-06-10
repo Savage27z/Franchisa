@@ -118,7 +118,15 @@ export default function FaucetPage() {
                 <p className="text-sm text-red-400">
                   {error.message?.includes("User rejected")
                     ? "Transaction rejected"
-                    : "Transaction failed. Are you on Arbitrum Sepolia?"}
+                    : error.message?.toLowerCase().includes("insufficient funds") ||
+                        error.message?.toLowerCase().includes("exceeds the balance")
+                      ? "You need Arbitrum Sepolia ETH for gas. Get some free at faucet.arbitrum.io, then try again."
+                      : error.message?.toLowerCase().includes("chain")
+                        ? "Wrong network — switch your wallet to Arbitrum Sepolia and try again."
+                        : `Transaction failed: ${
+                            (error as { shortMessage?: string }).shortMessage ??
+                            error.message?.slice(0, 140)
+                          }`}
                 </p>
               </div>
             )}

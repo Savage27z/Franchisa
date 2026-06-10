@@ -1,6 +1,7 @@
 "use client";
 
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
+import { arbitrumSepolia } from "wagmi/chains";
 import { REGISTRY_ABI, MOCK_TOKEN_ABI, CONTRACT_ADDRESSES, tickerToBytes32 } from "@/lib/contracts";
 
 /**
@@ -19,6 +20,7 @@ export function useSubmitVote() {
       abi: REGISTRY_ABI,
       functionName: "submitVote",
       args: [tickerToBytes32(ticker), proposalId, choice],
+      chainId: arbitrumSepolia.id,
     });
   };
 
@@ -123,6 +125,7 @@ export function useFaucet() {
       abi: MOCK_TOKEN_ABI,
       functionName: "faucet",
       args: [address, amount],
+      chainId: arbitrumSepolia.id,
     });
   };
 
