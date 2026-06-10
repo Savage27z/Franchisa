@@ -9,18 +9,18 @@ import "../src/MockTokenizedStock.sol";
 ///      Keyed by (ticker, meetingId, proposalId) to support meeting epochs.
 contract MockStylusEngine {
     // voter => ticker => meetingId => proposalId => voted
-    mapping(address => mapping(bytes32 => mapping(uint256 => mapping(uint8 => bool)))) public voted;
+    mapping(address => mapping(bytes32 => mapping(uint256 => mapping(uint256 => bool)))) public voted;
     // ticker => meetingId => proposalId => choice => weight
-    mapping(bytes32 => mapping(uint256 => mapping(uint8 => mapping(uint8 => uint256)))) public weights;
+    mapping(bytes32 => mapping(uint256 => mapping(uint256 => mapping(uint256 => uint256)))) public weights;
     // ticker => meetingId => proposalId => count
-    mapping(bytes32 => mapping(uint256 => mapping(uint8 => uint256))) public counts;
+    mapping(bytes32 => mapping(uint256 => mapping(uint256 => uint256))) public counts;
 
-    function cast_proxy_vote(
+    function castProxyVote(
         address voter,
         bytes32 ticker,
         uint256 meetingId,
-        uint8 proposalId,
-        uint8 choice,
+        uint256 proposalId,
+        uint256 choice,
         uint256 balance
     ) external returns (bool) {
         if (voted[voter][ticker][meetingId][proposalId]) return false;
@@ -32,10 +32,10 @@ contract MockStylusEngine {
         return true;
     }
 
-    function compile_final_results(
+    function compileFinalResults(
         bytes32 ticker,
         uint256 meetingId,
-        uint8 proposalId
+        uint256 proposalId
     ) external view returns (uint256, uint256, uint256) {
         return (
             weights[ticker][meetingId][proposalId][1], // yes
@@ -44,29 +44,29 @@ contract MockStylusEngine {
         );
     }
 
-    function get_voter_count(
+    function getVoterCount(
         bytes32 ticker,
         uint256 meetingId,
-        uint8 proposalId
+        uint256 proposalId
     ) external view returns (uint256) {
         return counts[ticker][meetingId][proposalId];
     }
 
-    function has_user_voted(
+    function hasUserVoted(
         address voter,
         bytes32 ticker,
         uint256 meetingId,
-        uint8 proposalId
+        uint256 proposalId
     ) external view returns (bool) {
         return voted[voter][ticker][meetingId][proposalId];
     }
 
-    function get_user_vote(
+    function getUserVote(
         address,
         bytes32,
         uint256,
-        uint8
-    ) external pure returns (uint8, uint256) {
+        uint256
+    ) external pure returns (uint256, uint256) {
         return (0, 0);
     }
 }
@@ -91,7 +91,7 @@ contract FranchisaGovernanceRegistryTest is Test {
         vm.roll(100);
 
         engine = new MockStylusEngine();
-        token = new MockTokenizedStock();
+        token = new MockTokenizedStock("Mock Tokenized TSLA", "mTSLA");
         registry = new FranchisaGovernanceRegistry(
             address(engine),
             address(token)

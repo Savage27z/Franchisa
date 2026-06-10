@@ -25,17 +25,31 @@ function cleanAddress(value: string | undefined, fallback: string): string {
 export const CONTRACT_ADDRESSES = {
   registry: cleanAddress(
     process.env.NEXT_PUBLIC_REGISTRY_ADDRESS,
-    "0x0000000000000000000000000000000000000000"
+    "0x2e330aa279B69F40Ece5BC55AAC295f9c2d29f1e"
   ),
   stylusEngine: cleanAddress(
     process.env.NEXT_PUBLIC_STYLUS_ADDRESS,
-    "0x0000000000000000000000000000000000000000"
+    "0x5f4a788b9614b1177b7a75b5645aa955f6af82e1"
   ),
   mockToken: cleanAddress(
     process.env.NEXT_PUBLIC_TOKEN_ADDRESS,
-    "0x0000000000000000000000000000000000000000"
+    "0xe46e388BD1d4f8C22cD333eD94D00d0CCDa374Dd"
   ),
 } as const;
+
+// ─── Per-Ticker Tokenized Stocks (Arbitrum Sepolia) ──────────────────────────
+// Each company meeting is gated by its own token — holding mTSLA grants no
+// voting power at NVIDIA's meeting. Mirrors registry.tickerTokens.
+
+export const TICKER_TOKENS: Record<
+  string,
+  { address: `0x${string}`; symbol: string }
+> = {
+  TSLA: { address: "0xe46e388BD1d4f8C22cD333eD94D00d0CCDa374Dd", symbol: "mTSLA" },
+  AAPL: { address: "0x90CE290F2904C67c60a6efaae2Ae0765e7b7bb81", symbol: "mAAPL" },
+  NVDA: { address: "0xb630d4A005b584D7825412aa3b593Be26ac41b55", symbol: "mNVDA" },
+  MSFT: { address: "0xb81aC0BAd553448E5a6178E1FD5f3F54557e0359", symbol: "mMSFT" },
+};
 
 // ─── Robinhood Chain Testnet Addresses ──────────────────────────────────────
 

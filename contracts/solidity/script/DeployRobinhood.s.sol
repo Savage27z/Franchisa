@@ -23,7 +23,7 @@ contract DeployRobinhoodScript is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy mock tokenized stock on Robinhood Chain
-        MockTokenizedStock token = new MockTokenizedStock();
+        MockTokenizedStock token = new MockTokenizedStock("Mock Tokenized TSLA", "mTSLA");
         console.log("MockTokenizedStock (mTSLA) deployed on Robinhood Chain at:", address(token));
 
         // Mint some initial tokens to the deployer for demo

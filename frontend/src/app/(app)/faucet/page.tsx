@@ -1,16 +1,26 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Droplets, CheckCircle2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "wagmi";
 import { useFaucet, useTokenBalance } from "@/hooks/use-governance";
+import { TICKER_TOKENS } from "@/lib/contracts";
+
+const TICKERS = Object.keys(TICKER_TOKENS);
 
 export default function FaucetPage() {
   const { address, isConnected } = useAccount();
-  const { balance, formatted, refetch: refetchBalance } = useTokenBalance();
-  const { claimTokens, txHash, isPending, isConfirming, isSuccess, error } = useFaucet();
+  const [selected, setSelected] = useState<string>("NVDA");
+  const token = TICKER_TOKENS[selected];
+
+  const { formatted, refetch: refetchBalance } = useTokenBalance(
+    token.address,
+    token.symbol
+  );
+  const { claimTokens, txHash, isPending, isConfirming, isSuccess, error } =
+    useFaucet();
 
   // Refresh balance after successful claim
   useEffect(() => {
@@ -20,8 +30,8 @@ export default function FaucetPage() {
   }, [isSuccess, refetchBalance]);
 
   const handleClaim = () => {
-    // Claim 1,000 mTSLA tokens
-    claimTokens(BigInt("1000000000000000000000"));
+    // Claim 1,000 tokens of the selected company's stock
+    claimTokens(BigInt("1000000000000000000000"), token.address);
   };
 
   return (
@@ -37,8 +47,9 @@ export default function FaucetPage() {
           Token Faucet
         </h1>
         <p className="text-muted-foreground text-[15px] leading-relaxed max-w-lg">
-          Claim mock tokenized stock (mTSLA) on Arbitrum Sepolia to participate
-          in governance voting. Each claim gives you 1,000 tokens.
+          Claim mock tokenized stock on Arbitrum Sepolia. Each company&apos;s
+          meeting is gated by its own token — to vote on NVDA proposals you
+          need mNVDA, for TSLA you need mTSLA, and so on.
         </p>
       </motion.div>
 
@@ -58,6 +69,26 @@ export default function FaucetPage() {
           </div>
         ) : (
           <div className="space-y-6">
+            {/* Token Selector */}
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Company stock</p>
+              <div className="grid grid-cols-4 gap-2">
+                {TICKERS.map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setSelected(t)}
+                    className={`h-11 rounded-xl text-sm font-medium transition-colors duration-200 cursor-pointer border ${
+                      selected === t
+                        ? "bg-foreground text-background border-transparent"
+                        : "bg-muted/40 dark:bg-white/5 text-foreground/70 border-border dark:border-white/10 hover:bg-muted dark:hover:bg-white/10"
+                    }`}
+                  >
+                    {TICKER_TOKENS[t].symbol}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Current Balance */}
             <div className="flex items-center justify-between p-4 rounded-xl bg-muted/50 dark:bg-white/5">
               <div>
@@ -85,7 +116,7 @@ export default function FaucetPage() {
               ) : (
                 <>
                   <Droplets className="h-4 w-4 mr-2" />
-                  Claim 1,000 mTSLA
+                  Claim 1,000 {token.symbol}
                 </>
               )}
             </Button>
@@ -134,8 +165,8 @@ export default function FaucetPage() {
 
             {/* Info */}
             <p className="text-xs text-muted-foreground/50 text-center">
-              mTSLA is a mock tokenized stock for testnet demonstration.
-              Not a real security. Max 10,000 tokens per claim.
+              Mock tokenized stocks for testnet demonstration. Not real
+              securities. Max 10,000 tokens per claim, 24h cooldown per token.
             </p>
           </div>
         )}

@@ -24,7 +24,10 @@ contract MockTokenizedStock is ERC20, ERC20Permit, ERC20Votes, Ownable {
     /// @notice Last faucet claim timestamp per address
     mapping(address => uint256) public lastFaucetClaim;
 
-    constructor() ERC20("Mock Tokenized TSLA", "mTSLA") ERC20Permit("Mock Tokenized TSLA") Ownable(msg.sender) {
+    constructor(
+        string memory name_,
+        string memory symbol_
+    ) ERC20(name_, symbol_) ERC20Permit(name_) Ownable(msg.sender) {
         // Mint 1M tokens to deployer for initial distribution
         _mint(msg.sender, 1_000_000 * 10 ** 18);
         // Auto-delegate deployer so their votes count from block 0

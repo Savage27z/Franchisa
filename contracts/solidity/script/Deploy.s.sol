@@ -17,7 +17,7 @@ contract DeployScript is Script {
         console.log("MockStylusEngine deployed at:", address(engine));
 
         // 2. Deploy mock tokenized stock
-        MockTokenizedStock token = new MockTokenizedStock();
+        MockTokenizedStock token = new MockTokenizedStock("Mock Tokenized TSLA", "mTSLA");
         console.log("MockTokenizedStock deployed at:", address(token));
 
         // 3. Deploy governance registry

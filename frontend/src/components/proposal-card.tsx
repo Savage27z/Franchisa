@@ -21,6 +21,7 @@ import {
   getVotePercentage,
 } from "@/lib/mock-data";
 import { useSubmitVote, useHasVoted, useVoteResults, useTokenBalance } from "@/hooks/use-governance";
+import { TICKER_TOKENS } from "@/lib/contracts";
 import { useAccount } from "wagmi";
 
 const riskStyles = {
@@ -42,7 +43,9 @@ export function ProposalCard({
 }: ProposalCardProps) {
   const [expanded, setExpanded] = useState(false);
   const { address, isConnected } = useAccount();
-  const { balance } = useTokenBalance();
+  // Balance of THIS company's tokenized stock — other tokens carry no weight here
+  const tickerToken = ticker ? TICKER_TOKENS[ticker.toUpperCase()] : undefined;
+  const { balance } = useTokenBalance(tickerToken?.address, tickerToken?.symbol);
 
   // On-chain voting
   const {

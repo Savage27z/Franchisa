@@ -117,14 +117,19 @@ export function useHasVoted(ticker: string, proposalId: number) {
 }
 
 /**
- * Hook to get the current user's token balance (vote weight).
+ * Hook to get the current user's balance of a tokenized stock.
+ * Defaults to the mTSLA token for backwards compatibility.
  */
-export function useTokenBalance() {
+export function useTokenBalance(
+  tokenAddress?: `0x${string}`,
+  symbol: string = "mTSLA"
+) {
   const { address } = useAccount();
+  const token = tokenAddress ?? (CONTRACT_ADDRESSES.mockToken as `0x${string}`);
 
   const { data, isLoading, refetch } = useReadContract({
-    address: CONTRACT_ADDRESSES.mockToken as `0x${string}`,
-      chainId: arbitrumSepolia.id,
+    address: token,
+    chainId: arbitrumSepolia.id,
     abi: MOCK_TOKEN_ABI,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
@@ -135,14 +140,16 @@ export function useTokenBalance() {
 
   return {
     balance: data as bigint | undefined,
-    formatted: data ? `${(Number(data) / 1e18).toLocaleString()} mTSLA` : "0 mTSLA",
+    formatted: data
+      ? `${(Number(data) / 1e18).toLocaleString()} ${symbol}`
+      : `0 ${symbol}`,
     isLoading,
     refetch,
   };
 }
 
 /**
- * Hook to claim testnet tokens from the faucet.
+ * Hook to claim testnet tokens from a tokenized stock's faucet.
  */
 export function useFaucet() {
   const { address } = useAccount();
@@ -153,7 +160,10 @@ export function useFaucet() {
     hash,
   });
 
-  const claimTokens = async (amount: bigint = BigInt("1000000000000000000000")) => {
+  const claimTokens = async (
+    amount: bigint = BigInt("1000000000000000000000"),
+    tokenAddress?: `0x${string}`
+  ) => {
     if (!address) return;
     reset(); // clear any stale error from a previous attempt
     try {
@@ -162,7 +172,7 @@ export function useFaucet() {
       return; // user declined the network switch
     }
     writeContract({
-      address: CONTRACT_ADDRESSES.mockToken as `0x${string}`,
+      address: tokenAddress ?? (CONTRACT_ADDRESSES.mockToken as `0x${string}`),
       chainId: arbitrumSepolia.id,
       abi: MOCK_TOKEN_ABI,
       functionName: "faucet",

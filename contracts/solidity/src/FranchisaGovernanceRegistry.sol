@@ -77,7 +77,12 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
     }
 
     address public stylusVotingEngine;
-    address public tokenizedAssetRegistry; // ERC20Votes token
+    address public tokenizedAssetRegistry; // Default ERC20Votes token (fallback)
+
+    /// @notice Per-ticker tokenized stock. Vote weight for a meeting comes
+    ///         from the token of THAT company — holding mTSLA must not grant
+    ///         voting power at NVIDIA's meeting.
+    mapping(bytes32 => address) public tickerTokens;
 
     /// @notice Monotonically increasing meeting nonce — each registration gets a unique ID.
     ///         Prevents stale vote flags in the engine when a ticker is closed & re-registered.
@@ -155,6 +160,18 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
 
     function setTokenRegistry(address _registry) external onlyOwner {
         tokenizedAssetRegistry = _registry;
+    }
+
+    /// @notice Map a ticker to its own tokenized stock contract.
+    function setTickerToken(bytes32 ticker, address token) external onlyOwner {
+        tickerTokens[ticker] = token;
+    }
+
+    /// @notice The ERC20Votes token that carries voting power for a ticker.
+    ///         Falls back to the default token when no per-ticker token is set.
+    function votingTokenOf(bytes32 ticker) public view returns (address) {
+        address t = tickerTokens[ticker];
+        return t == address(0) ? tokenizedAssetRegistry : t;
     }
 
     /// @notice Emergency pause — halts all voting and registration
@@ -270,7 +287,9 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
 
         // Use snapshot voting: weight = balance at registration block
         // This prevents transfer-and-vote attacks (vote, send tokens to alt, revote)
-        uint256 voteWeight = IERC20Votes(tokenizedAssetRegistry).getPastVotes(
+        // Weight comes from THIS ticker's own token — holding another
+        // company's tokenized stock grants no voting power here.
+        uint256 voteWeight = IERC20Votes(votingTokenOf(ticker)).getPastVotes(
             msg.sender,
             m.snapshotBlock
         );
