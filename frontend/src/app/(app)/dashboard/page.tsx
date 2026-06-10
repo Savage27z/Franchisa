@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import { motion } from "framer-motion";
 import { MeetingCard } from "@/components/meeting-card";
 import { StatsBar } from "@/components/stats-bar";
 import { useReadContract, useReadContracts } from "wagmi";
+import { arbitrumSepolia } from "wagmi/chains";
 import {
   REGISTRY_ABI,
   CONTRACT_ADDRESSES,
@@ -20,6 +21,7 @@ export default function DashboardPage() {
   // Get count of registered tickers from chain
   const { data: tickerCount } = useReadContract({
     address: registryAddress,
+      chainId: arbitrumSepolia.id,
     abi: REGISTRY_ABI,
     functionName: "getRegisteredTickerCount",
     query: { enabled: isDeployed },
@@ -30,6 +32,7 @@ export default function DashboardPage() {
   // Fetch all registered ticker bytes32 values
   const tickerContracts = Array.from({ length: count }, (_, i) => ({
     address: registryAddress,
+      chainId: arbitrumSepolia.id,
     abi: REGISTRY_ABI,
     functionName: "registeredTickers" as const,
     args: [BigInt(i)] as const,
@@ -47,6 +50,7 @@ export default function DashboardPage() {
 
   const meetingContracts = (tickers ?? []).map((t) => ({
     address: registryAddress,
+      chainId: arbitrumSepolia.id,
     abi: REGISTRY_ABI,
     functionName: "getMeeting" as const,
     args: [t] as const,

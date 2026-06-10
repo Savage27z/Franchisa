@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import { motion } from "framer-motion";
 import { Wallet, Vote, TrendingUp, ExternalLink, Copy, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/liquid-glass-button";
 import { useAccount, useReadContract } from "wagmi";
+import { arbitrumSepolia } from "wagmi/chains";
 import { formatUnits } from "viem";
 import { CONTRACT_ADDRESSES, MOCK_TOKEN_ABI } from "@/lib/contracts";
 import { useState } from "react";
@@ -17,6 +18,7 @@ export default function ProfilePage() {
 
   const { data: tokenBalance } = useReadContract({
     address: tokenAddress,
+    chainId: arbitrumSepolia.id,
     abi: MOCK_TOKEN_ABI,
     functionName: "balanceOf",
     args: address ? [address] : undefined,

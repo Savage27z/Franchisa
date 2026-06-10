@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { motion } from "framer-motion";
 import { useReadContract, useReadContracts } from "wagmi";
+import { arbitrumSepolia } from "wagmi/chains";
 import {
   REGISTRY_ABI,
   CONTRACT_ADDRESSES,
@@ -16,6 +17,7 @@ const isDeployed = registryAddress !== ZERO_ADDRESS;
 export function StatsBar() {
   const { data: onChainCount } = useReadContract({
     address: registryAddress,
+      chainId: arbitrumSepolia.id,
     abi: REGISTRY_ABI,
     functionName: "getActiveMeetingCount",
     query: { enabled: isDeployed },
@@ -23,6 +25,7 @@ export function StatsBar() {
 
   const { data: tickerCount } = useReadContract({
     address: registryAddress,
+      chainId: arbitrumSepolia.id,
     abi: REGISTRY_ABI,
     functionName: "getRegisteredTickerCount",
     query: { enabled: isDeployed },
@@ -32,6 +35,7 @@ export function StatsBar() {
   const { data: headers } = useReadContracts({
     contracts: MOCK_MEETINGS.map((m) => ({
       address: registryAddress,
+      chainId: arbitrumSepolia.id,
       abi: REGISTRY_ABI,
       functionName: "getMeeting" as const,
       args: [tickerToBytes32(m.ticker)] as const,

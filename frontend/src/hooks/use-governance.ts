@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from "wagmi";
 import { arbitrumSepolia } from "wagmi/chains";
@@ -17,10 +17,10 @@ export function useSubmitVote() {
   const submitVote = (ticker: string, proposalId: number, choice: number) => {
     writeContract({
       address: CONTRACT_ADDRESSES.registry as `0x${string}`,
+      chainId: arbitrumSepolia.id,
       abi: REGISTRY_ABI,
       functionName: "submitVote",
       args: [tickerToBytes32(ticker), proposalId, choice],
-      chainId: arbitrumSepolia.id,
     });
   };
 
@@ -40,6 +40,7 @@ export function useSubmitVote() {
 export function useVoteResults(ticker: string, proposalId: number) {
   const { data, isLoading, refetch } = useReadContract({
     address: CONTRACT_ADDRESSES.registry as `0x${string}`,
+      chainId: arbitrumSepolia.id,
     abi: REGISTRY_ABI,
     functionName: "getResults",
     args: [tickerToBytes32(ticker), proposalId],
@@ -69,6 +70,7 @@ export function useHasVoted(ticker: string, proposalId: number) {
 
   const { data, isLoading } = useReadContract({
     address: CONTRACT_ADDRESSES.registry as `0x${string}`,
+      chainId: arbitrumSepolia.id,
     abi: REGISTRY_ABI,
     functionName: "hasUserVoted",
     args: address ? [address, tickerToBytes32(ticker), proposalId] : undefined,
@@ -91,6 +93,7 @@ export function useTokenBalance() {
 
   const { data, isLoading, refetch } = useReadContract({
     address: CONTRACT_ADDRESSES.mockToken as `0x${string}`,
+      chainId: arbitrumSepolia.id,
     abi: MOCK_TOKEN_ABI,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
@@ -122,10 +125,10 @@ export function useFaucet() {
     if (!address) return;
     writeContract({
       address: CONTRACT_ADDRESSES.mockToken as `0x${string}`,
+      chainId: arbitrumSepolia.id,
       abi: MOCK_TOKEN_ABI,
       functionName: "faucet",
       args: [address, amount],
-      chainId: arbitrumSepolia.id,
     });
   };
 

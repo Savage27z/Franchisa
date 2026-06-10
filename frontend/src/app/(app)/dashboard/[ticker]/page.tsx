@@ -4,6 +4,7 @@ import { use } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useReadContract } from "wagmi";
+import { arbitrumSepolia } from "wagmi/chains";
 import { ArrowLeft, ExternalLink, Zap } from "lucide-react";
 import { ProposalCard } from "@/components/proposal-card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ export default function MeetingDetailPage({
   // Read real on-chain voter count for proposal 1 (representative)
   const { data: onChainVoterCount } = useReadContract({
     address: CONTRACT_ADDRESSES.registry as `0x${string}`,
+    chainId: arbitrumSepolia.id,
     abi: REGISTRY_ABI,
     functionName: "getVoterCount",
     args: [tickerToBytes32(ticker), 1],

@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useReadContract, useReadContracts, useAccount } from "wagmi";
+import { arbitrumSepolia } from "wagmi/chains";
 import {
   REGISTRY_ABI,
   CONTRACT_ADDRESSES,
@@ -20,6 +21,7 @@ const isDeployed = registryAddress !== ZERO_ADDRESS;
 export function useRegisteredTickerCount() {
   return useReadContract({
     address: registryAddress,
+      chainId: arbitrumSepolia.id,
     abi: REGISTRY_ABI,
     functionName: "getRegisteredTickerCount",
     query: { enabled: isDeployed },
@@ -34,6 +36,7 @@ export function useOnChainMeeting(ticker: string) {
 
   const { data: meetingData, isLoading: meetingLoading } = useReadContract({
     address: registryAddress,
+      chainId: arbitrumSepolia.id,
     abi: REGISTRY_ABI,
     functionName: "getMeeting",
     args: [tickerBytes],
@@ -51,6 +54,7 @@ export function useOnChainProposals(ticker: string, proposalCount: number) {
 
   const contracts = Array.from({ length: proposalCount }, (_, i) => ({
     address: registryAddress,
+      chainId: arbitrumSepolia.id,
     abi: REGISTRY_ABI,
     functionName: "getProposal" as const,
     args: [tickerBytes, i + 1] as const,
@@ -75,6 +79,7 @@ export function useMeetings(): {
   const { data: headers } = useReadContracts({
     contracts: MOCK_MEETINGS.map((m) => ({
       address: registryAddress,
+      chainId: arbitrumSepolia.id,
       abi: REGISTRY_ABI,
       functionName: "getMeeting" as const,
       args: [tickerToBytes32(m.ticker)] as const,
@@ -131,6 +136,7 @@ export function useMeetingDetail(ticker: string) {
   // Get meeting info from chain
   const { data: meetingData, isLoading: meetingLoading } = useReadContract({
     address: registryAddress,
+      chainId: arbitrumSepolia.id,
     abi: REGISTRY_ABI,
     functionName: "getMeeting",
     args: [tickerBytes],
