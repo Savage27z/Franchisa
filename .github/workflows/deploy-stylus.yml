@@ -37,14 +37,19 @@ jobs:
       - name: Deploy Stylus contract
         working-directory: contracts/stylus
         run: |
+          set -o pipefail
           cargo stylus deploy \
             --endpoint https://sepolia-rollup.arbitrum.io/rpc \
             --private-key ${{ secrets.DEPLOYER_PRIVATE_KEY }} \
             --no-verify \
             2>&1 | tee deploy-output.txt
 
-          # Extract deployed address
-          STYLUS_ADDRESS=$(grep -oP 'deployed code at address: \K0x[a-fA-F0-9]+' deploy-output.txt || true)
+          # Extract deployed address (strip ANSI color codes first)
+          STYLUS_ADDRESS=$(sed 's/\x1b\[[0-9;]*m//g' deploy-output.txt | grep -oiP 'deployed code at address[: ]+\K0x[a-fA-F0-9]{40}' | head -1 || true)
+          if [ -z "$STYLUS_ADDRESS" ]; then
+            echo "ERROR: could not extract deployed address from output"
+            exit 1
+          fi
           echo "STYLUS_ADDRESS=$STYLUS_ADDRESS" >> $GITHUB_ENV
           echo "## Stylus Engine Deployed" >> $GITHUB_STEP_SUMMARY
           echo "Address: \`$STYLUS_ADDRESS\`" >> $GITHUB_STEP_SUMMARY

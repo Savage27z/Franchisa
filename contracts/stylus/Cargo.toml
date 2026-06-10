@@ -3,6 +3,10 @@ name = "franchisa-proxy-oracle"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "franchisa-proxy-oracle"
+path = "src/main.rs"
+
 [lib]
 crate-type = ["lib", "cdylib"]
 
