@@ -6,5 +6,8 @@ pub extern "C" fn main() {}
 
 #[cfg(feature = "export-abi")]
 fn main() {
-    franchisa_proxy_oracle::print_from_args();
+    stylus_sdk::abi::export::print_abi::<franchisa_proxy_oracle::ProxyOracle>(
+        "MIT",
+        "pragma solidity ^0.8.23;",
+    );
 }
