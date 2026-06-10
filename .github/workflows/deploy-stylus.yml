@@ -26,6 +26,10 @@ jobs:
       - name: Install cargo-stylus
         run: cargo install cargo-stylus
 
+      - name: Generate lockfile
+        working-directory: contracts/stylus
+        run: cargo generate-lockfile
+
       - name: Check Stylus contract
         working-directory: contracts/stylus
         run: cargo stylus check --endpoint https://sepolia-rollup.arbitrum.io/rpc
