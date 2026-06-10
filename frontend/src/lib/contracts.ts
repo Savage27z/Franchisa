@@ -12,16 +12,38 @@ export const ROBINHOOD_TESTNET_CHAIN_ID = 46630;
 
 // ─── Contract Addresses (update after deployment) ────────────────────────────
 
+/**
+ * Strip BOMs, zero-width characters, and whitespace that can sneak into
+ * env var values (e.g. pasted into the Vercel dashboard) and make viem
+ * reject the address as invalid.
+ */
+function cleanAddress(value: string | undefined, fallback: string): string {
+  const cleaned = value?.replace(/[^0-9a-fA-Fx]/g, "") ?? "";
+  return /^0x[0-9a-fA-F]{40}$/.test(cleaned) ? cleaned : fallback;
+}
+
 export const CONTRACT_ADDRESSES = {
-  registry: process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || "0x0000000000000000000000000000000000000000",
-  stylusEngine: process.env.NEXT_PUBLIC_STYLUS_ADDRESS || "0x0000000000000000000000000000000000000000",
-  mockToken: process.env.NEXT_PUBLIC_TOKEN_ADDRESS || "0x0000000000000000000000000000000000000000",
+  registry: cleanAddress(
+    process.env.NEXT_PUBLIC_REGISTRY_ADDRESS,
+    "0x0000000000000000000000000000000000000000"
+  ),
+  stylusEngine: cleanAddress(
+    process.env.NEXT_PUBLIC_STYLUS_ADDRESS,
+    "0x0000000000000000000000000000000000000000"
+  ),
+  mockToken: cleanAddress(
+    process.env.NEXT_PUBLIC_TOKEN_ADDRESS,
+    "0x0000000000000000000000000000000000000000"
+  ),
 } as const;
 
 // ─── Robinhood Chain Testnet Addresses ──────────────────────────────────────
 
 export const ROBINHOOD_ADDRESSES = {
-  mockToken: process.env.NEXT_PUBLIC_ROBINHOOD_TOKEN_ADDRESS || "0x4956dB7e5604B197C8a44eDb165a6e530C4848C3",
+  mockToken: cleanAddress(
+    process.env.NEXT_PUBLIC_ROBINHOOD_TOKEN_ADDRESS,
+    "0x4956dB7e5604B197C8a44eDb165a6e530C4848C3"
+  ),
 } as const;
 
 // ─── Registry ABI (read + write functions we need) ───────────────────────────
