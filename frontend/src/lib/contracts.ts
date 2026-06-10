@@ -77,7 +77,7 @@ export const REGISTRY_ABI = [
     ],
     name: "getUserVote",
     outputs: [
-      { name: "choice", type: "uint8" },
+      { name: "choice", type: "uint256" },
       { name: "weight", type: "uint256" },
     ],
     stateMutability: "view",
