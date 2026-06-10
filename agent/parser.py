@@ -48,46 +48,81 @@ For meetingDate, convert to Unix timestamp (seconds since epoch).
 """
 
 
+def _call_anthropic(prompt: str, api_key: str) -> str:
+    """Call the Anthropic API directly."""
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=api_key)
+    message = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=4096,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return message.content[0].text.strip()
+
+
+def _call_openrouter(prompt: str, api_key: str) -> str:
+    """Call any model through OpenRouter's OpenAI-compatible API."""
+    import httpx
+
+    model = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+    console.print(f"[dim]OpenRouter model: {model}[/dim]")
+
+    resp = httpx.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": model,
+            "max_tokens": 4096,
+            "messages": [{"role": "user", "content": prompt}],
+        },
+        timeout=180,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if "error" in data:
+        raise RuntimeError(f"OpenRouter error: {data['error']}")
+    return data["choices"][0]["message"]["content"].strip()
+
+
 def parse_proxy_statement(
     filing_text: str,
     ticker: str,
     api_key: Optional[str] = None,
 ) -> Optional[dict]:
     """
-    Parse a proxy statement using Claude API.
+    Parse a proxy statement using an LLM.
+
+    Uses the Anthropic API when ANTHROPIC_API_KEY is set, otherwise falls
+    back to OpenRouter (OPENROUTER_API_KEY + optional OPENROUTER_MODEL).
 
     Args:
         filing_text: Raw text content of the DEF 14A filing
         ticker: Company ticker symbol (e.g., "TSLA")
-        api_key: Anthropic API key (falls back to env var)
+        api_key: Anthropic API key (falls back to env vars)
 
     Returns:
         Parsed JSON dict with proposals, or None on failure
     """
-    api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        console.print("[red]ANTHROPIC_API_KEY not set[/red]")
+    anthropic_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+
+    if not anthropic_key and not openrouter_key:
+        console.print("[red]Neither ANTHROPIC_API_KEY nor OPENROUTER_API_KEY is set[/red]")
         return None
 
     try:
-        import anthropic
+        prompt = f"{EXTRACTION_PROMPT}\n\nTicker: {ticker}\n\nProxy Statement Text:\n{filing_text}"
 
-        client = anthropic.Anthropic(api_key=api_key)
-
-        console.print(f"[cyan]Sending {ticker} filing to Claude for parsing...[/cyan]")
-
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"{EXTRACTION_PROMPT}\n\nTicker: {ticker}\n\nProxy Statement Text:\n{filing_text}",
-                }
-            ],
-        )
-
-        response_text = message.content[0].text.strip()
+        if anthropic_key:
+            console.print(f"[cyan]Sending {ticker} filing to Claude for parsing...[/cyan]")
+            response_text = _call_anthropic(prompt, anthropic_key)
+        else:
+            console.print(f"[cyan]Sending {ticker} filing to OpenRouter for parsing...[/cyan]")
+            response_text = _call_openrouter(prompt, openrouter_key)
 
         # Extract JSON from response (handle markdown code blocks)
         if response_text.startswith("```"):
