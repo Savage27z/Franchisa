@@ -121,11 +121,12 @@ export default function FaucetPage() {
                     : error.message?.toLowerCase().includes("insufficient funds") ||
                         error.message?.toLowerCase().includes("exceeds the balance")
                       ? "You need Arbitrum Sepolia ETH for gas. Get some free at faucet.arbitrum.io, then try again."
-                      : error.message?.toLowerCase().includes("chain")
+                      : error.name === "ChainMismatchError" ||
+                          error.message?.includes("does not match the target chain")
                         ? "Wrong network — switch your wallet to Arbitrum Sepolia and try again."
                         : `Transaction failed: ${
                             (error as { shortMessage?: string }).shortMessage ??
-                            error.message?.slice(0, 140)
+                            error.message?.slice(0, 200)
                           }`}
                 </p>
               </div>
