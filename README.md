@@ -143,7 +143,7 @@ governance registry can record votes, verified on-chain.
 | Resource | Link |
 |----------|------|
 | Frontend | [franchisa.vercel.app](https://franchisa.vercel.app) |
-| Registry on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0x2e330aa279B69F40Ece5BC55AAC295f9c2d29f1e) |
+| Registry on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xb5aD396bd8f5980e58023885ac10Af2c125DFFc1) |
 | Engine on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0x5f4a788b9614b1177b7a75b5645aa955f6af82e1) |
 | Token on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xe46e388BD1d4f8C22cD333eD94D00d0CCDa374Dd) |
 | mTSLA on Robinhood Chain | [View Contract (Verified)](https://explorer.testnet.chain.robinhood.com/address/0x4956dB7e5604B197C8a44eDb165a6e530C4848C3) |
@@ -155,7 +155,7 @@ governance registry can record votes, verified on-chain.
 | Contract | Address | Purpose |
 |----------|---------|---------|
 | **ProxyOracle Stylus Engine (Rust/WASM)** | [`0x5f4a788b9614b1177b7a75b5645aa955f6af82e1`](https://sepolia.arbiscan.io/address/0x5f4a788b9614b1177b7a75b5645aa955f6af82e1) | Real Arbitrum Stylus contract — vote storage and weighted aggregation, deployed and activated via CI |
-| **FranchisaGovernanceRegistry** | [`0x2e330aa279B69F40Ece5BC55AAC295f9c2d29f1e`](https://sepolia.arbiscan.io/address/0x2e330aa279B69F40Ece5BC55AAC295f9c2d29f1e) | Meeting registration, filing provenance, snapshot vote routing |
+| **FranchisaGovernanceRegistry** | [`0xb5aD396bd8f5980e58023885ac10Af2c125DFFc1`](https://sepolia.arbiscan.io/address/0xb5aD396bd8f5980e58023885ac10Af2c125DFFc1) | Meeting registration, filing provenance, snapshot vote routing |
 | **mTSLA** | [`0xe46e388BD1d4f8C22cD333eD94D00d0CCDa374Dd`](https://sepolia.arbiscan.io/address/0xe46e388BD1d4f8C22cD333eD94D00d0CCDa374Dd) | Tesla tokenized stock (ERC20Votes + faucet) |
 | **mAAPL** | [`0x90CE290F2904C67c60a6efaae2Ae0765e7b7bb81`](https://sepolia.arbiscan.io/address/0x90CE290F2904C67c60a6efaae2Ae0765e7b7bb81) | Apple tokenized stock |
 | **mNVDA** | [`0xb630d4A005b584D7825412aa3b593Be26ac41b55`](https://sepolia.arbiscan.io/address/0xb630d4A005b584D7825412aa3b593Be26ac41b55) | NVIDIA tokenized stock |
@@ -452,7 +452,7 @@ User -> Registry (validates token balance) -> Engine (records vote)
 ### Access Control
 
 - **Meeting registration**: `onlyAgent` modifier — only addresses authorized by the contract owner
-- **Vote casting**: Requires non-zero voting power at snapshot block (ERC20Votes `getPastVotes`)
+- **Vote casting**: Requires non-zero voting power in the meeting's company token (snapshot balance, with a testnet fallback to live delegated balance for wallets funded after the snapshot)
 - **Engine registry lock**: `onlyOwner` can call `setAuthorizedRegistry` — set once at deployment
 - **Double-vote prevention**: Per-voter per-proposal flag in the engine
 - **Emergency pause**: `Pausable` modifier on both `registerMeeting` and `submitVote` — owner can halt all operations
@@ -461,7 +461,7 @@ User -> Registry (validates token balance) -> Engine (records vote)
 
 ### Vote Integrity
 
-- **Snapshot voting**: Vote weight = `getPastVotes(voter, snapshotBlock)` — balance is locked at the block when the meeting was registered, preventing transfer-and-vote attacks
+- **Snapshot voting**: Vote weight = `getPastVotes(voter, snapshotBlock)` — balance is locked at the block when the meeting was registered, preventing transfer-and-vote attacks for pre-snapshot holders. **Testnet fallback**: wallets funded after the snapshot vote with their live delegated balance (`getVotes`) — the open faucet already makes testnet weight free, so this adds no new attack surface; production custodian-issued tokens would use strict snapshots only
 - **ERC20Votes token**: mTSLA uses OpenZeppelin's `ERC20Votes` with auto-delegation on faucet/mint
 - **Meeting date enforcement**: `require(block.timestamp < meetingDate)` — votes rejected after the meeting date passes
 - **Meeting epochs**: Each `registerMeeting` assigns a monotonically increasing `meetingId` nonce. Engine storage is keyed by `(ticker, meetingId, proposalId)` — closing and re-registering the same ticker starts a clean epoch with no stale vote flags

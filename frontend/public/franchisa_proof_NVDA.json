@@ -1,11 +1,11 @@
 {
   "franchisa_governance_proof": {
     "version": "1.0.0",
-    "generatedAt": "2026-06-10T22:44:22.283957+00:00",
+    "generatedAt": "2026-06-11T11:14:58.527187+00:00",
     "network": "arbitrum-sepolia",
     "chainId": 421614,
     "contracts": {
-      "registry": "0x2e330aa279B69F40Ece5BC55AAC295f9c2d29f1e",
+      "registry": "0xb5aD396bd8f5980e58023885ac10Af2c125DFFc1",
       "stylusEngine": "0x5f4a788b9614b1177b7a75b5645aa955f6af82e1"
     },
     "meeting": {
@@ -13,7 +13,7 @@
       "companyName": "NVIDIA CORPORATION",
       "meetingDate": "2026-06-24",
       "meetingId": 4,
-      "snapshotBlock": 11032345,
+      "snapshotBlock": 11036421,
       "totalVoters": 1
     },
     "filingProvenance": {
@@ -57,7 +57,7 @@
       },
       {
         "proposalId": 4,
-        "title": "Simple Majority Vote Standard",
+        "title": "Stockholder Proposal: Simple Majority Vote Standard",
         "yesWeight": "0",
         "noWeight": "0",
         "abstainWeight": "0",
@@ -68,7 +68,7 @@
       },
       {
         "proposalId": 5,
-        "title": "Report on Faith-Based Community Resource Groups",
+        "title": "Stockholder Proposal: Report on Faith-Based Community Resource Groups",
         "yesWeight": "0",
         "noWeight": "0",
         "abstainWeight": "0",
@@ -79,7 +79,7 @@
       },
       {
         "proposalId": 6,
-        "title": "Report on Workforce Civil Liberties",
+        "title": "Stockholder Proposal: Report on Workforce Civil Liberties",
         "yesWeight": "0",
         "noWeight": "0",
         "abstainWeight": "0",
@@ -90,7 +90,7 @@
       },
       {
         "proposalId": 7,
-        "title": "Greenhouse Gas Emissions Disclosure",
+        "title": "Stockholder Proposal: Greenhouse Gas Emissions Disclosure",
         "yesWeight": "0",
         "noWeight": "0",
         "abstainWeight": "0",
@@ -100,7 +100,7 @@
         "voterCount": 0
       }
     ],
-    "signature": "a32a5d73cf40451cc10d1c5a29bd16001b9353d3ff9c87be378f44b8dbda4e537188c519a92500815523e0e30d5e833594128da341212699bedc8593daa549de1b",
+    "signature": "207e56ad3c7738b50b5d5806769a0a50f5accdef9c07d68e9553a490742d95851983a6643742cf3029091aab78cf01b6466e59a36002244201d05cba8c3793311c",
     "signer": "0xD78D1D5Dd356DECc696192D68b2cd046266D3046"
   }
 }

@@ -248,8 +248,26 @@ contract FranchisaGovernanceRegistryTest is Test {
 
         address noTokens = address(0xDEAD);
         vm.prank(noTokens);
-        vm.expectRevert("No voting power at snapshot block");
+        vm.expectRevert("No voting power: hold this company's token");
         registry.submitVote(TSLA, 1, 1);
+    }
+
+    /// Wallets funded AFTER the snapshot still vote with their live
+    /// delegated balance (testnet faucet fallback).
+    function test_submitVote_postSnapshotClaimFallsBackToLiveBalance() public {
+        _registerTSLAMeeting();
+
+        address lateClaimer = address(0xFA0CE7);
+        // Faucet claim AFTER the meeting snapshot
+        vm.roll(block.number + 10);
+        token.faucet(lateClaimer, 500 * 10 ** 18);
+        vm.roll(block.number + 1);
+
+        vm.prank(lateClaimer);
+        registry.submitVote(TSLA, 1, 1);
+
+        (uint256 yes,,) = registry.getResults(TSLA, 1);
+        assertEq(yes, 500 * 10 ** 18); // live balance counted
     }
 
     function test_submitVote_invalidChoice() public {

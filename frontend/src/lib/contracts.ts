@@ -25,7 +25,7 @@ function cleanAddress(value: string | undefined, fallback: string): string {
 export const CONTRACT_ADDRESSES = {
   registry: cleanAddress(
     process.env.NEXT_PUBLIC_REGISTRY_ADDRESS,
-    "0x2e330aa279B69F40Ece5BC55AAC295f9c2d29f1e"
+    "0xb5aD396bd8f5980e58023885ac10Af2c125DFFc1"
   ),
   stylusEngine: cleanAddress(
     process.env.NEXT_PUBLIC_STYLUS_ADDRESS,

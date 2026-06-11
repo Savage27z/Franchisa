@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 /// @notice Interface for ERC20Votes — getPastVotes for snapshot voting
 interface IERC20Votes {
     function getPastVotes(address account, uint256 timepoint) external view returns (uint256);
+    function getVotes(address account) external view returns (uint256);
     function balanceOf(address account) external view returns (uint256);
 }
 
@@ -285,15 +286,23 @@ contract FranchisaGovernanceRegistry is Ownable, Pausable, ReentrancyGuard {
             "Invalid proposal ID"
         );
 
-        // Use snapshot voting: weight = balance at registration block
-        // This prevents transfer-and-vote attacks (vote, send tokens to alt, revote)
         // Weight comes from THIS ticker's own token — holding another
         // company's tokenized stock grants no voting power here.
-        uint256 voteWeight = IERC20Votes(votingTokenOf(ticker)).getPastVotes(
+        // Snapshot first: weight = balance at registration block, which
+        // prevents transfer-and-vote attacks for pre-snapshot holders.
+        address votingToken = votingTokenOf(ticker);
+        uint256 voteWeight = IERC20Votes(votingToken).getPastVotes(
             msg.sender,
             m.snapshotBlock
         );
-        require(voteWeight > 0, "No voting power at snapshot block");
+        // Testnet UX fallback: wallets funded AFTER the snapshot vote with
+        // their live delegated balance. The open faucet already makes weight
+        // freely mintable on testnet, so this adds no new attack surface;
+        // production uses custodian-issued tokens with strict snapshots.
+        if (voteWeight == 0) {
+            voteWeight = IERC20Votes(votingToken).getVotes(msg.sender);
+        }
+        require(voteWeight > 0, "No voting power: hold this company's token");
 
         bool success = IProxyOracleStylus(stylusVotingEngine).castProxyVote(
             msg.sender,
