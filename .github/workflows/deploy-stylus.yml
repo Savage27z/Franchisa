@@ -6,7 +6,7 @@ on:
       registry_address:
         description: 'Registry contract address to authorize'
         required: true
-        default: '0xe873D942cB0aF313AE664A88bc918A1aD606B946'
+        default: '0xb5aD396bd8f5980e58023885ac10Af2c125DFFc1'
 
 env:
   CARGO_TERM_COLOR: always
