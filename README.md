@@ -23,6 +23,7 @@ Franchisa lets holders of tokenized stocks (RWA tokens like mTSLA, mAAPL) partic
 - [Governance Proof](#governance-proof)
 - [Security](#security)
 - [Threat Model — Known Limitations](#threat-model--known-limitations)
+- [Limitations & Future Work](#limitations--future-work)
 - [Project Structure](#project-structure)
 - [Environment Variables](#environment-variables)
 - [Testing](#testing)
@@ -69,6 +70,18 @@ SEC EDGAR (DEF 14A proxy filings)
 5. **VOTE** — Tokenized stockholders connect their wallet, see the proposals, and cast weighted votes (For / Against / Abstain). Vote weight equals their token balance
 6. **AGGREGATE** — The Rust/Stylus voting engine aggregates all votes with proper weighting, preventing double-voting
 7. **PROVE** — Final results are packaged into a cryptographically signed governance proof (ECDSA on secp256k1) that custodians like Robinhood or DTCC can independently verify
+
+### Proof That This Works With Real Data
+
+NVIDIA's 2026 annual meeting ([DEF 14A `0001045810-26-000036`](https://www.sec.gov/Archives/edgar/data/1045810/000104581026000036/nvda-20260512.htm)) was ingested end-to-end by the agent — not demo mode, not simulated:
+
+1. The agent fetched the real filing from SEC EDGAR's submissions API (`data.sec.gov/submissions/CIK0001045810.json`)
+2. The full filing text was hashed (`keccak256`) and stored on-chain as `filingHash` — anyone can re-fetch and verify
+3. Claude AI extracted 7 proposals (board election, say-on-pay, PwC ratification, 4 stockholder proposals)
+4. All 7 proposals are registered on the live registry at [`0xb5aD...Fc1`](https://sepolia.arbiscan.io/address/0xb5aD396bd8f5980e58023885ac10Af2c125DFFc1) with the filing hash and accession number
+5. A signed governance proof ships with the repo at `frontend/public/franchisa_proof_NVDA.json` — verify it with `python agent.py verify ../frontend/public/franchisa_proof_NVDA.json`
+
+The other three meetings (TSLA, AAPL, MSFT) use simulated filings because their real proxies describe meetings that already concluded. They are clearly labeled "Simulated" in the UI.
 
 ---
 
@@ -225,12 +238,13 @@ forge build         # Compile with via-ir
 ### Test
 
 ```bash
-forge test -vv      # Run all 34 tests with verbose output
+forge test -vv      # Run all 35 tests with verbose output
 ```
 
 **Test coverage:**
-- 13 tests for `FranchisaGovernanceRegistry` (registration, voting, closing, access control, edge cases)
+- 29 tests for `FranchisaGovernanceRegistry` (registration, voting, closing, access control, snapshots, epochs, filing provenance)
 - 6 tests for `MockStylusEngine` auth guard (owner checks, registry-only voting, direct call rejection)
+- 8 Rust unit tests for the Stylus engine (see below)
 
 ### Deploy
 
@@ -496,6 +510,24 @@ This is a hackathon prototype. The following limitations are acknowledged and wo
 
 ---
 
+## Limitations & Future Work
+
+This is a hackathon prototype. We deliberately name what it doesn't do yet.
+
+### Would custodians actually accept these proofs?
+
+Not today. The proof format (ECDSA-signed JSON with filing hash, vote tallies, and agent trace) is designed to be *mechanically verifiable* — any custodian can check the signature, re-hash the EDGAR filing, and confirm the tallies match on-chain state. But no custodian has agreed to ingest it. The path to adoption requires: (1) regulatory clarity on whether tokenized stock holders have governance rights, (2) custodian API integrations (Backed, Securitize, DTCC), and (3) legal opinions on the binding nature of on-chain votes. Franchisa builds the missing infrastructure — the business development is separate work.
+
+### What if the AI hallucinates a proposal?
+
+The agent's VALIDATE step schema-checks every parsed proposal (ticker must match, proposal count must be non-zero, dates must be valid, categories must be from an allowed set). But LLMs can produce plausible-looking garbage that passes schema checks. Production mitigations: (1) run two independent LLMs and diff the output, (2) require human review before `registerMeeting`, (3) add an on-chain dispute window where token holders can flag incorrect proposals before voting opens. The current prototype trusts the agent — the threat model table above lists this as the "EDGAR content injection" risk.
+
+### What about mainnet?
+
+The architecture is mainnet-ready — the contracts, agent, and frontend all parameterize chain config. What changes: (1) faucets are replaced by real RWA token integrations (e.g. Backed bTSLA), (2) the agent wallet moves to a multisig with timelock, (3) strict snapshot-only voting replaces the testnet live-balance fallback, (4) the proof signer key moves to an HSM. None of these require architectural changes.
+
+---
+
 ## Project Structure
 
 ```
@@ -598,16 +630,36 @@ NEXT_PUBLIC_TOKEN_ADDRESS=0x...
 
 ## Testing
 
-### Smart Contract Tests
+### Stylus Engine Tests (Rust)
+
+```bash
+cd contracts/stylus
+cargo test       # 8 unit tests with motsu (mocked Stylus storage)
+```
+
+**Rust Test Suite (8 tests):**
+
+| Test | What It Verifies |
+|------|-----------------|
+| `cast_vote_records_correctly` | Vote stored with correct choice, weight, and voter flag |
+| `double_vote_prevented` | Second vote from same voter returns false, original unchanged |
+| `invalid_choice_rejected` | Choice > 2 returns false, no state change |
+| `zero_balance_rejected` | Zero token balance returns false |
+| `meeting_epoch_isolation` | Same voter can vote in different meeting epochs (re-registration) |
+| `multiple_voters_aggregate` | Two voters' weights aggregate correctly per choice |
+| `compile_results_all_choices` | Yes/No/Abstain tallies correct with three voters |
+| `cross_ticker_isolation` | Votes for TSLA don't affect NVDA tallies |
+
+### Solidity Tests (Foundry)
 
 ```bash
 cd contracts/solidity
-forge test -vv                    # 34 tests, verbose
+forge test -vv                    # 35 tests, verbose
 forge test --gas-report           # With gas profiling
 forge test --match-contract Auth  # Only auth guard tests
 ```
 
-**Test Suite (34 tests):**
+**Solidity Test Suite (35 tests):**
 
 | Test | What It Verifies |
 |------|-----------------|
@@ -645,6 +697,7 @@ forge test --match-contract Auth  # Only auth guard tests
 | `test_voteRevertsFromNonRegistry` | Direct calls blocked |
 | `test_voteWorksBeforeRegistrySet` | Open access when registry is zero address |
 | `test_ownerIsImmutable` | Owner is set at deployment |
+| `test_submitVote_postSnapshotClaimFallsBackToLiveBalance` | Fresh wallet funded after snapshot can vote via live-balance fallback |
 
 ### Frontend
 

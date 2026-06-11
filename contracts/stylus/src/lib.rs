@@ -155,3 +155,167 @@ impl ProxyOracle {
         (choice, weight)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ticker_tsla() -> FixedBytes<32> {
+        let mut bytes = [0u8; 32];
+        bytes[0] = b'T'; bytes[1] = b'S'; bytes[2] = b'L'; bytes[3] = b'A';
+        FixedBytes::from(bytes)
+    }
+
+    fn ticker_nvda() -> FixedBytes<32> {
+        let mut bytes = [0u8; 32];
+        bytes[0] = b'N'; bytes[1] = b'V'; bytes[2] = b'D'; bytes[3] = b'A';
+        FixedBytes::from(bytes)
+    }
+
+    fn voter_a() -> Address {
+        Address::from([1u8; 20])
+    }
+
+    fn voter_b() -> Address {
+        Address::from([2u8; 20])
+    }
+
+    #[motsu::test]
+    fn cast_vote_records_correctly(contract: ProxyOracle) {
+        let voter = voter_a();
+        let ticker = ticker_tsla();
+        let meeting_id = U256::from(1u8);
+        let proposal_id = U256::from(1u8);
+        let choice = U256::from(1u8); // Yes
+        let weight = U256::from(1000u64);
+
+        let result = contract.cast_proxy_vote(voter, ticker, meeting_id, proposal_id, choice, weight);
+        assert!(result);
+
+        assert!(contract.has_user_voted(voter, ticker, meeting_id, proposal_id));
+
+        let (recorded_choice, recorded_weight) = contract.get_user_vote(voter, ticker, meeting_id, proposal_id);
+        assert_eq!(recorded_choice, choice);
+        assert_eq!(recorded_weight, weight);
+    }
+
+    #[motsu::test]
+    fn double_vote_prevented(contract: ProxyOracle) {
+        let voter = voter_a();
+        let ticker = ticker_tsla();
+        let meeting_id = U256::from(1u8);
+        let proposal_id = U256::from(1u8);
+
+        let first = contract.cast_proxy_vote(voter, ticker, meeting_id, proposal_id, U256::from(1u8), U256::from(1000u64));
+        assert!(first);
+
+        let second = contract.cast_proxy_vote(voter, ticker, meeting_id, proposal_id, U256::from(0u8), U256::from(500u64));
+        assert!(!second);
+
+        // Original vote unchanged
+        let (choice, weight) = contract.get_user_vote(voter, ticker, meeting_id, proposal_id);
+        assert_eq!(choice, U256::from(1u8));
+        assert_eq!(weight, U256::from(1000u64));
+    }
+
+    #[motsu::test]
+    fn invalid_choice_rejected(contract: ProxyOracle) {
+        let result = contract.cast_proxy_vote(
+            voter_a(), ticker_tsla(), U256::from(1u8), U256::from(1u8),
+            U256::from(3u8), // Invalid: only 0, 1, 2 allowed
+            U256::from(1000u64),
+        );
+        assert!(!result);
+        assert!(!contract.has_user_voted(voter_a(), ticker_tsla(), U256::from(1u8), U256::from(1u8)));
+    }
+
+    #[motsu::test]
+    fn zero_balance_rejected(contract: ProxyOracle) {
+        let result = contract.cast_proxy_vote(
+            voter_a(), ticker_tsla(), U256::from(1u8), U256::from(1u8),
+            U256::from(1u8),
+            U256::ZERO, // Zero balance
+        );
+        assert!(!result);
+        assert!(!contract.has_user_voted(voter_a(), ticker_tsla(), U256::from(1u8), U256::from(1u8)));
+    }
+
+    #[motsu::test]
+    fn meeting_epoch_isolation(contract: ProxyOracle) {
+        let voter = voter_a();
+        let ticker = ticker_tsla();
+        let proposal_id = U256::from(1u8);
+
+        // Vote in meeting epoch 1
+        let r1 = contract.cast_proxy_vote(voter, ticker, U256::from(1u8), proposal_id, U256::from(1u8), U256::from(500u64));
+        assert!(r1);
+
+        // Same voter, same ticker, NEW epoch (meeting re-registered) — should succeed
+        let r2 = contract.cast_proxy_vote(voter, ticker, U256::from(2u8), proposal_id, U256::from(0u8), U256::from(800u64));
+        assert!(r2);
+
+        // Verify both recorded independently
+        let (c1, w1) = contract.get_user_vote(voter, ticker, U256::from(1u8), proposal_id);
+        assert_eq!(c1, U256::from(1u8));
+        assert_eq!(w1, U256::from(500u64));
+
+        let (c2, w2) = contract.get_user_vote(voter, ticker, U256::from(2u8), proposal_id);
+        assert_eq!(c2, U256::from(0u8));
+        assert_eq!(w2, U256::from(800u64));
+    }
+
+    #[motsu::test]
+    fn multiple_voters_aggregate(contract: ProxyOracle) {
+        let ticker = ticker_tsla();
+        let meeting_id = U256::from(1u8);
+        let proposal_id = U256::from(1u8);
+
+        // Voter A: Yes with weight 1000
+        contract.cast_proxy_vote(voter_a(), ticker, meeting_id, proposal_id, U256::from(1u8), U256::from(1000u64));
+        // Voter B: No with weight 2000
+        contract.cast_proxy_vote(voter_b(), ticker, meeting_id, proposal_id, U256::from(0u8), U256::from(2000u64));
+
+        let (yes, no, abstain) = contract.compile_final_results(ticker, meeting_id, proposal_id);
+        assert_eq!(yes, U256::from(1000u64));
+        assert_eq!(no, U256::from(2000u64));
+        assert_eq!(abstain, U256::ZERO);
+
+        assert_eq!(contract.get_voter_count(ticker, meeting_id, proposal_id), U256::from(2u8));
+    }
+
+    #[motsu::test]
+    fn compile_results_all_choices(contract: ProxyOracle) {
+        let ticker = ticker_nvda();
+        let meeting_id = U256::from(1u8);
+        let proposal_id = U256::from(1u8);
+
+        // Three voters, one per choice
+        contract.cast_proxy_vote(Address::from([1u8; 20]), ticker, meeting_id, proposal_id, U256::from(0u8), U256::from(100u64)); // No
+        contract.cast_proxy_vote(Address::from([2u8; 20]), ticker, meeting_id, proposal_id, U256::from(1u8), U256::from(300u64)); // Yes
+        contract.cast_proxy_vote(Address::from([3u8; 20]), ticker, meeting_id, proposal_id, U256::from(2u8), U256::from(200u64)); // Abstain
+
+        let (yes, no, abstain) = contract.compile_final_results(ticker, meeting_id, proposal_id);
+        assert_eq!(yes, U256::from(300u64));
+        assert_eq!(no, U256::from(100u64));
+        assert_eq!(abstain, U256::from(200u64));
+
+        assert_eq!(contract.get_voter_count(ticker, meeting_id, proposal_id), U256::from(3u8));
+    }
+
+    #[motsu::test]
+    fn cross_ticker_isolation(contract: ProxyOracle) {
+        let meeting_id = U256::from(1u8);
+        let proposal_id = U256::from(1u8);
+
+        // Vote on TSLA
+        contract.cast_proxy_vote(voter_a(), ticker_tsla(), meeting_id, proposal_id, U256::from(1u8), U256::from(500u64));
+        // Vote on NVDA (same voter, same proposal_id — different ticker)
+        contract.cast_proxy_vote(voter_a(), ticker_nvda(), meeting_id, proposal_id, U256::from(0u8), U256::from(700u64));
+
+        let (tsla_yes, _, _) = contract.compile_final_results(ticker_tsla(), meeting_id, proposal_id);
+        let (_, nvda_no, _) = contract.compile_final_results(ticker_nvda(), meeting_id, proposal_id);
+
+        assert_eq!(tsla_yes, U256::from(500u64));
+        assert_eq!(nvda_no, U256::from(700u64));
+    }
+}
