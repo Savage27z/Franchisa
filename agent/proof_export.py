@@ -1,4 +1,4 @@
-﻿"""
+"""
 Component D: Governance Proof Export
 
 Queries the on-chain Stylus voting engine for final results,
@@ -157,7 +157,7 @@ def generate_governance_proof(
         proof_payload["franchisa_governance_proof"]["signer"] = account.address
 
         console.print(
-            f"[green]✓ Governance proof generated and signed[/green]\n"
+            f"[green]Governance proof generated and signed[/green]\n"
             f"  Ticker: {ticker}\n"
             f"  Proposals: {len(results)}\n"
             f"  Total voters: {total_voters}\n"
@@ -220,14 +220,14 @@ def verify_governance_proof(proof: dict) -> bool:
 
         if recovered.lower() == signer.lower():
             console.print(
-                f"[green]✓ Proof signature VALID[/green]\n"
+                f"[green]Proof signature VALID[/green]\n"
                 f"  Signer: {signer}\n"
                 f"  Recovered: {recovered}"
             )
             return True
         else:
             console.print(
-                f"[red]✗ Proof signature INVALID[/red]\n"
+                f"[red]Proof signature INVALID[/red]\n"
                 f"  Declared signer: {signer}\n"
                 f"  Recovered: {recovered}"
             )
