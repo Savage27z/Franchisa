@@ -72,10 +72,9 @@ jobs:
           echo "## Registry Authorized" >> $GITHUB_STEP_SUMMARY
           echo "Registry \`${{ github.event.inputs.registry_address }}\` authorized on Stylus engine \`${{ env.STYLUS_ADDRESS }}\`" >> $GITHUB_STEP_SUMMARY
 
-      - name: Gas benchmark — vote via Solidity engine
+      - name: Deployment summary
         if: env.STYLUS_ADDRESS != ''
         run: |
-          echo "## Gas Comparison" >> $GITHUB_STEP_SUMMARY
-          echo "Run submitVote through both engines on the same meeting and compare gas." >> $GITHUB_STEP_SUMMARY
-          echo "Solidity engine: \`0xF7D8891eB22Be860c2F666CcBFB2D81d28229aa1\`" >> $GITHUB_STEP_SUMMARY
-          echo "Stylus engine: \`${{ env.STYLUS_ADDRESS }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "## Measured Gas (Arbitrum Sepolia)" >> $GITHUB_STEP_SUMMARY
+          echo "submitVote through registry + Stylus engine: ~480k gas" >> $GITHUB_STEP_SUMMARY
+          echo "(measured txs: 0x7d488c95fcb11876d8381f9ddfec8feeec6556d0f066830f9f1df7d96cd4c189, 479,785 gas)" >> $GITHUB_STEP_SUMMARY

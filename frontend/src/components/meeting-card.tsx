@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { REAL_FILING_TICKERS } from "@/lib/contracts";
 import { BorderRotate } from "@/components/ui/animated-gradient-border";
 import type { Meeting } from "@/lib/mock-data";
 
@@ -61,9 +62,20 @@ export function MeetingCard({
                 {meeting.companyName}
               </p>
             </div>
-            <Badge className="text-[11px] font-medium rounded-full bg-white/10 text-white/70 border-white/10 hover:bg-white/10">
-              {meeting.isActive ? "Active" : "Closed"}
-            </Badge>
+            <div className="flex flex-col items-end gap-1.5">
+              <Badge className="text-[11px] font-medium rounded-full bg-white/10 text-white/70 border-white/10 hover:bg-white/10">
+                {meeting.isActive ? "Active" : "Closed"}
+              </Badge>
+              {REAL_FILING_TICKERS[meeting.ticker.toUpperCase()] ? (
+                <Badge className="text-[10px] rounded-full bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10">
+                  Real SEC Filing
+                </Badge>
+              ) : (
+                <Badge className="text-[10px] rounded-full bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/10">
+                  Simulated
+                </Badge>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4 mb-6">

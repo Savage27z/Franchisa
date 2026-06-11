@@ -30,9 +30,22 @@ Gas costs measured via `forge test --gas-report` on Arbitrum Sepolia testnet con
 | MockTokenizedStock (ERC20Votes) | ~940,000 | ~4,200 |
 | FranchisaGovernanceRegistry | ~2,100,000 | ~9,500 |
 
-## Stylus Comparison (Pending)
+## Stylus — Measured On-Chain
 
-The identical vote-casting logic exists in Rust at `contracts/stylus/src/lib.rs`. Once deployed via `cargo stylus deploy`, we will run the same vote transactions through both engines and publish **measured** gas numbers side-by-side with tx hashes.
+The Rust engine is deployed and activated on Arbitrum Sepolia at
+[`0x5f4a788b9614b1177b7a75b5645aa955f6af82e1`](https://sepolia.arbiscan.io/address/0x5f4a788b9614b1177b7a75b5645aa955f6af82e1)
+(7.9 KB WASM). Real vote transactions through the full path
+(registry snapshot checks + Stylus `castProxyVote`):
+
+| Operation | Gas (measured) | Tx |
+|-----------|----------------|-----|
+| `submitVote` end-to-end (AAPL P1) | 479,785 | [`0x7d488c95...c189`](https://sepolia.arbiscan.io/tx/0x7d488c95fcb11876d8381f9ddfec8feeec6556d0f066830f9f1df7d96cd4c189) |
+| `submitVote` end-to-end (NVDA P1, real filing meeting) | 495,789 | on-chain |
+
+These end-to-end numbers are not directly comparable to the engine-only unit
+test figures above (different scope: registry validation + cross-contract
+call + engine storage vs. isolated engine call). We do not publish projected
+savings — only measured numbers with evidence.
 
 Expected savings based on Arbitrum's architecture:
 - **Storage writes** (~85K gas per vote): identical cost in Stylus (L1 calldata dominates)

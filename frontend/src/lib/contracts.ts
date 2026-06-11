@@ -51,6 +51,19 @@ export const TICKER_TOKENS: Record<
   MSFT: { address: "0xb81aC0BAd553448E5a6178E1FD5f3F54557e0359", symbol: "mMSFT" },
 };
 
+// ─── Filing Provenance ───────────────────────────────────────────────────────
+// Meetings whose proposals were extracted from a REAL SEC EDGAR filing by the
+// ingestion agent. The on-chain filingHash is the keccak256 of the actual
+// document and can be independently verified. All other meetings use
+// realistic simulated filings (clearly labeled in the UI).
+
+export const REAL_FILING_TICKERS: Record<string, { edgarUrl: string }> = {
+  NVDA: {
+    edgarUrl:
+      "https://www.sec.gov/Archives/edgar/data/1045810/000104581026000036/nvda-20260512.htm",
+  },
+};
+
 // ─── Robinhood Chain Testnet Addresses ──────────────────────────────────────
 
 export const ROBINHOOD_ADDRESSES = {

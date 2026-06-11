@@ -19,7 +19,7 @@ const steps = [
     number: "03",
     label: "Stylus Voting",
     description:
-      "High-performance Rust contract via Arbitrum Stylus. Balance-weighted votes, 90% cheaper gas than Solidity.",
+      "Real Rust/WASM contract deployed and activated via Arbitrum Stylus. Snapshot-weighted votes recorded and aggregated on-chain.",
   },
   {
     number: "04",

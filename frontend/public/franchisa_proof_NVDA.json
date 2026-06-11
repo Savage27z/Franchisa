@@ -1,0 +1,106 @@
+{
+  "franchisa_governance_proof": {
+    "version": "1.0.0",
+    "generatedAt": "2026-06-10T22:44:22.283957+00:00",
+    "network": "arbitrum-sepolia",
+    "chainId": 421614,
+    "contracts": {
+      "registry": "0x2e330aa279B69F40Ece5BC55AAC295f9c2d29f1e",
+      "stylusEngine": "0x5f4a788b9614b1177b7a75b5645aa955f6af82e1"
+    },
+    "meeting": {
+      "ticker": "NVDA",
+      "companyName": "NVIDIA CORPORATION",
+      "meetingDate": "2026-06-24",
+      "meetingId": 4,
+      "snapshotBlock": 11032345,
+      "totalVoters": 1
+    },
+    "filingProvenance": {
+      "filingHash": "0xca0c010e6a6afe9fc97d42a9ba55dff2462783c2b1288b7d93e425356e705dd0",
+      "accessionNumber": "0001045810-26-000036",
+      "note": "filingHash is keccak256 of the normalized DEF 14A text. Re-fetch the filing from SEC EDGAR by accession number, normalize, hash, and compare to verify the proposals' source."
+    },
+    "results": [
+      {
+        "proposalId": 1,
+        "title": "Election of Ten Directors",
+        "yesWeight": "1000000000000000000000000",
+        "noWeight": "0",
+        "abstainWeight": "0",
+        "yesPercentage": "100.00%",
+        "noPercentage": "0.00%",
+        "abstainPercentage": "0.00%",
+        "voterCount": 1
+      },
+      {
+        "proposalId": 2,
+        "title": "Advisory Approval of Executive Compensation",
+        "yesWeight": "0",
+        "noWeight": "0",
+        "abstainWeight": "0",
+        "yesPercentage": "0.00%",
+        "noPercentage": "0.00%",
+        "abstainPercentage": "0.00%",
+        "voterCount": 0
+      },
+      {
+        "proposalId": 3,
+        "title": "Ratification of Independent Registered Public Accounting Firm",
+        "yesWeight": "0",
+        "noWeight": "0",
+        "abstainWeight": "0",
+        "yesPercentage": "0.00%",
+        "noPercentage": "0.00%",
+        "abstainPercentage": "0.00%",
+        "voterCount": 0
+      },
+      {
+        "proposalId": 4,
+        "title": "Simple Majority Vote Standard",
+        "yesWeight": "0",
+        "noWeight": "0",
+        "abstainWeight": "0",
+        "yesPercentage": "0.00%",
+        "noPercentage": "0.00%",
+        "abstainPercentage": "0.00%",
+        "voterCount": 0
+      },
+      {
+        "proposalId": 5,
+        "title": "Report on Faith-Based Community Resource Groups",
+        "yesWeight": "0",
+        "noWeight": "0",
+        "abstainWeight": "0",
+        "yesPercentage": "0.00%",
+        "noPercentage": "0.00%",
+        "abstainPercentage": "0.00%",
+        "voterCount": 0
+      },
+      {
+        "proposalId": 6,
+        "title": "Report on Workforce Civil Liberties",
+        "yesWeight": "0",
+        "noWeight": "0",
+        "abstainWeight": "0",
+        "yesPercentage": "0.00%",
+        "noPercentage": "0.00%",
+        "abstainPercentage": "0.00%",
+        "voterCount": 0
+      },
+      {
+        "proposalId": 7,
+        "title": "Greenhouse Gas Emissions Disclosure",
+        "yesWeight": "0",
+        "noWeight": "0",
+        "abstainWeight": "0",
+        "yesPercentage": "0.00%",
+        "noPercentage": "0.00%",
+        "abstainPercentage": "0.00%",
+        "voterCount": 0
+      }
+    ],
+    "signature": "a32a5d73cf40451cc10d1c5a29bd16001b9353d3ff9c87be378f44b8dbda4e537188c519a92500815523e0e30d5e833594128da341212699bedc8593daa549de1b",
+    "signer": "0xD78D1D5Dd356DECc696192D68b2cd046266D3046"
+  }
+}

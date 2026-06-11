@@ -67,9 +67,34 @@ def generate_governance_proof(
 
     try:
         # Import submitter for on-chain reads
-        from submitter import get_onchain_results
+        from submitter import get_onchain_results, ticker_to_bytes32, REGISTRY_ABI
 
         console.print(f"[cyan]Generating governance proof for {ticker}...[/cyan]")
+
+        # Hydrate meeting metadata straight from the chain — the proof must
+        # reflect on-chain state, not caller-supplied values.
+        w3 = Web3(Web3.HTTPProvider(rpc_url))
+        registry = w3.eth.contract(
+            address=Web3.to_checksum_address(registry_address),
+            abi=REGISTRY_ABI,
+        )
+        meeting = registry.functions.getMeeting(ticker_to_bytes32(ticker)).call()
+        # Meeting struct: ticker, companyName, meetingDate, registeredAt,
+        # isActive, proposalCount, filingHash, accessionNumber, snapshotBlock, meetingId
+        on_chain_company = meeting[1]
+        if not on_chain_company:
+            console.print(f"[red]No meeting registered on-chain for {ticker}[/red]")
+            return None
+
+        company_name = company_name or on_chain_company
+        meeting_date = meeting_date or datetime.fromtimestamp(
+            meeting[2], tz=timezone.utc
+        ).strftime("%Y-%m-%d")
+        proposal_count = proposal_count or int(meeting[5])
+        filing_hash = "0x" + meeting[6].hex()
+        accession_number = meeting[7]
+        snapshot_block = int(meeting[8])
+        meeting_id = int(meeting[9])
 
         # Read on-chain results
         results = get_onchain_results(
@@ -101,7 +126,18 @@ def generate_governance_proof(
                     "ticker": ticker,
                     "companyName": company_name,
                     "meetingDate": meeting_date,
+                    "meetingId": meeting_id,
+                    "snapshotBlock": snapshot_block,
                     "totalVoters": total_voters,
+                },
+                "filingProvenance": {
+                    "filingHash": filing_hash,
+                    "accessionNumber": accession_number,
+                    "note": (
+                        "filingHash is keccak256 of the normalized DEF 14A text. "
+                        "Re-fetch the filing from SEC EDGAR by accession number, "
+                        "normalize, hash, and compare to verify the proposals' source."
+                    ),
                 },
                 "results": results,
             }

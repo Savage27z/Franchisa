@@ -78,9 +78,9 @@ SEC EDGAR (DEF 14A proxy filings)
 |-----------|----------|-----------|------|
 | **AI Ingestion Agent** | Python 3.11+ | Click CLI, Rich, web3.py | Autonomous filing watcher, SEC EDGAR parser, on-chain submitter |
 | **Governance Registry** | Solidity 0.8.20 | OpenZeppelin, Foundry | Meeting/proposal storage, vote routing, token balance validation |
-| **Voting Engine** | Rust | Arbitrum Stylus SDK | High-performance weighted vote aggregation (WASM on-chain) |
-| **Mock Stylus Engine** | Solidity 0.8.20 | Foundry | API-identical Solidity placeholder (Stylus can't compile on Windows) |
-| **Mock Tokenized Stock** | Solidity 0.8.20 | OpenZeppelin ERC-20 | mTSLA token with public faucet for testnet demos |
+| **Voting Engine** | Rust | Arbitrum Stylus SDK | Weighted vote aggregation, deployed + activated as WASM on Arbitrum Sepolia |
+| **Reference Engine** | Solidity 0.8.20 | Foundry | API-identical Solidity engine kept for unit tests and gas reference |
+| **Tokenized Stocks** | Solidity 0.8.20 | OpenZeppelin ERC20Votes | mTSLA / mAAPL / mNVDA / mMSFT — one per company, public faucets |
 | **Governance Proof** | Python | eth_account, ECDSA | Tamper-proof signed result export for custodian ingestion |
 | **Frontend** | TypeScript | Next.js 16, wagmi v3, RainbowKit v2 | Wallet-connected governance dashboard with live on-chain data |
 
@@ -114,17 +114,27 @@ SEC EDGAR (DEF 14A proxy filings)
 
 ## Why Stylus?
 
-The voting engine is written in **Rust** and targets **Arbitrum Stylus** (compiles to WASM that runs alongside the EVM) for a specific technical reason:
+The voting engine is a **real Rust/WASM Stylus contract, deployed and
+activated on Arbitrum Sepolia** at
+[`0x5f4a78...82e1`](https://sepolia.arbiscan.io/address/0x5f4a788b9614b1177b7a75b5645aa955f6af82e1) —
+not a Solidity stand-in. It is built and deployed through a GitHub Actions
+pipeline ([`deploy-stylus.yml`](.github/workflows/deploy-stylus.yml)) because
+Stylus toolchains don't compile on Windows; every deploy is reproducible CI.
 
-**Vote aggregation is compute-heavy.** Summing weighted votes across thousands of token holders, preventing double-votes, and compiling final results involves iteration and arithmetic that the EVM handles inefficiently. Stylus executes this same logic as native WASM with:
+Why WASM for a voting engine:
 
-- **90%+ gas savings** on pure compute operations (result compilation, signature verification)
-- **34% total savings** per vote (storage costs stay the same, compute drops dramatically)
-- **No API changes** — the Solidity interface is identical; swapping from MockStylusEngine to the real Stylus deployment is a single address update
+- **Vote aggregation is the compute-heavy path.** Weighted tallies,
+  double-vote guards, and result compilation are iteration + arithmetic —
+  exactly what WASM executes at near-native speed vs. EVM interpretation.
+- **Headroom for what's next.** Quadratic vote weighting, multi-class share
+  structures, and on-chain proof attestation belong in the engine; in
+  Solidity they'd be cost-prohibitive, in Rust they're a code change.
+- **Drop-in EVM interop.** The Solidity registry calls the WASM engine
+  through a plain interface (`castProxyVote`, `compileFinalResults`) — full
+  composability, zero API compromise.
 
-See [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md) for detailed forge gas report data and Solidity-vs-Stylus comparisons.
-
-> **Note:** The Stylus contract cannot currently be compiled on Windows due to a `native_keccak256` linker error. A `MockStylusEngine.sol` with an identical interface is deployed as a drop-in placeholder. The Rust source is at `contracts/stylus/src/lib.rs` and is ready for Linux/CI compilation.
+The engine enforces a registry-only auth guard at the WASM level: only the
+governance registry can record votes, verified on-chain.
 
 ---
 
@@ -133,9 +143,9 @@ See [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md) for detailed forge gas report dat
 | Resource | Link |
 |----------|------|
 | Frontend | [franchisa.vercel.app](https://franchisa.vercel.app) |
-| Registry on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xe873D942cB0aF313AE664A88bc918A1aD606B946) |
+| Registry on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0x2e330aa279B69F40Ece5BC55AAC295f9c2d29f1e) |
 | Engine on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0x5f4a788b9614b1177b7a75b5645aa955f6af82e1) |
-| Token on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b) |
+| Token on Arbiscan | [View Contract](https://sepolia.arbiscan.io/address/0xe46e388BD1d4f8C22cD333eD94D00d0CCDa374Dd) |
 | mTSLA on Robinhood Chain | [View Contract (Verified)](https://explorer.testnet.chain.robinhood.com/address/0x4956dB7e5604B197C8a44eDb165a6e530C4848C3) |
 
 ---
@@ -144,10 +154,16 @@ See [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md) for detailed forge gas report dat
 
 | Contract | Address | Purpose |
 |----------|---------|---------|
-| **FranchisaGovernanceRegistry** | [`0xe873D942cB0aF313AE664A88bc918A1aD606B946`](https://sepolia.arbiscan.io/address/0xe873D942cB0aF313AE664A88bc918A1aD606B946) | Meeting registration, vote routing, token balance checks |
-| **MockStylusEngine** | [`0x5f4a788b9614b1177b7a75b5645aa955f6af82e1`](https://sepolia.arbiscan.io/address/0x5f4a788b9614b1177b7a75b5645aa955f6af82e1) | Vote storage and aggregation (Solidity stand-in for Stylus) |
-| **MockTokenizedStock (mTSLA)** | [`0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b`](https://sepolia.arbiscan.io/address/0xDac5c91f20AB2419a5069c99e8cD7a0291E65B1b) | ERC-20 tokenized stock with public faucet |
+| **ProxyOracle Stylus Engine (Rust/WASM)** | [`0x5f4a788b9614b1177b7a75b5645aa955f6af82e1`](https://sepolia.arbiscan.io/address/0x5f4a788b9614b1177b7a75b5645aa955f6af82e1) | Real Arbitrum Stylus contract — vote storage and weighted aggregation, deployed and activated via CI |
+| **FranchisaGovernanceRegistry** | [`0x2e330aa279B69F40Ece5BC55AAC295f9c2d29f1e`](https://sepolia.arbiscan.io/address/0x2e330aa279B69F40Ece5BC55AAC295f9c2d29f1e) | Meeting registration, filing provenance, snapshot vote routing |
+| **mTSLA** | [`0xe46e388BD1d4f8C22cD333eD94D00d0CCDa374Dd`](https://sepolia.arbiscan.io/address/0xe46e388BD1d4f8C22cD333eD94D00d0CCDa374Dd) | Tesla tokenized stock (ERC20Votes + faucet) |
+| **mAAPL** | [`0x90CE290F2904C67c60a6efaae2Ae0765e7b7bb81`](https://sepolia.arbiscan.io/address/0x90CE290F2904C67c60a6efaae2Ae0765e7b7bb81) | Apple tokenized stock |
+| **mNVDA** | [`0xb630d4A005b584D7825412aa3b593Be26ac41b55`](https://sepolia.arbiscan.io/address/0xb630d4A005b584D7825412aa3b593Be26ac41b55) | NVIDIA tokenized stock |
+| **mMSFT** | [`0xb81aC0BAd553448E5a6178E1FD5f3F54557e0359`](https://sepolia.arbiscan.io/address/0xb81aC0BAd553448E5a6178E1FD5f3F54557e0359) | Microsoft tokenized stock |
 | **Agent/Deployer** | [`0xD78D1D5Dd356DECc696192D68b2cd046266D3046`](https://sepolia.arbiscan.io/address/0xD78D1D5Dd356DECc696192D68b2cd046266D3046) | Authorized agent that submits proposals |
+
+> Each company's meeting is gated by its **own** token — holding mTSLA grants
+> no voting power at NVIDIA's meeting (`registry.tickerTokens`).
 
 **Chain**: Arbitrum Sepolia (Chain ID `421614`)
 
@@ -159,12 +175,19 @@ See [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md) for detailed forge gas report dat
 
 **Currently Registered Meetings (Arbitrum Sepolia):**
 
-| Ticker | Company | Proposals | Meeting Date |
-|--------|---------|-----------|-------------|
-| TSLA | Tesla, Inc. | 4 (Board, Auditor, Exec Comp, Lobbying) | July 18, 2026 |
-| AAPL | Apple Inc. | 3 (Board, Stock Plan, AI Transparency) | July 8, 2026 |
-| NVDA | NVIDIA Corporation | 3 (Board, Exec Comp, Dual-Class Sunset) | Aug 2, 2026 |
-| MSFT | Microsoft Corporation | 5 (Board, Auditor, Exec Comp, AI Risk, Pay Gap) | June 30, 2026 |
+| Ticker | Company | Proposals | Meeting Date | Filing Source |
+|--------|---------|-----------|-------------|---------------|
+| NVDA | NVIDIA Corporation | 7 (Board, Say-on-Pay, PwC, 4 stockholder proposals) | June 24, 2026 | **Real** — [DEF 14A `0001045810-26-000036`](https://www.sec.gov/Archives/edgar/data/1045810/000104581026000036/nvda-20260512.htm), keccak256 hash on-chain |
+| TSLA | Tesla, Inc. | 4 (Board, Auditor, Exec Comp, Lobbying) | July 18, 2026 | Simulated (labeled in UI) |
+| AAPL | Apple Inc. | 3 (Board, Stock Plan, AI Transparency) | July 8, 2026 | Simulated (labeled in UI) |
+| MSFT | Microsoft Corporation | 5 (Board, Auditor, Exec Comp, AI Risk, Pay Gap) | June 30, 2026 | Simulated (labeled in UI) |
+
+NVIDIA's meeting is fully real: its proposals were extracted by the agent from
+the actual SEC filing, and the on-chain `filingHash` is the keccak256 of that
+document — re-fetch it from EDGAR and verify. The other three use realistic
+simulated filings so the demo always has votable meetings; their real proxies
+describe meetings that already concluded (you can't vote on the past). They
+are clearly labeled "Simulated" in the UI.
 
 ---
 
@@ -233,23 +256,27 @@ The deploy script automatically:
 
 **FranchisaGovernanceRegistry.sol** — The central contract. Stores meeting data (ticker, company name, date, proposals with titles/categories/risk ratings/board recommendations). Routes votes through the Stylus engine. Enforces `onlyAgent` for registration and validates token balances before voting.
 
-**MockStylusEngine.sol** — API-identical Solidity implementation of the Rust voting engine. Stores votes per-voter per-proposal, tracks aggregated weights by choice (Yes/No/Abstain), and prevents double-voting. Protected by an `onlyRegistry` modifier so votes can only be cast through the registry, not by direct calls.
+**MockStylusEngine.sol** — API-identical Solidity reference implementation of the Rust engine, kept for unit tests and gas comparison. The deployed engine on Arbitrum Sepolia is the **real Stylus WASM contract**.
 
-**MockTokenizedStock.sol** — Standard ERC-20 "Mock Tokenized TSLA" (mTSLA) with a public `faucet()` function (max 10,000 tokens per call) for testnet demos.
+**MockTokenizedStock.sol** — ERC20Votes tokenized stock with a public `faucet()` (max 10,000 tokens per call, 24h cooldown) and snapshot-based voting power. Deployed once per company: mTSLA, mAAPL, mNVDA, mMSFT.
 
-### Stylus Contract
+### Stylus Contract (deployed via CI)
+
+The Rust engine at `contracts/stylus/src/lib.rs` is compiled and deployed by
+the [`deploy-stylus.yml`](.github/workflows/deploy-stylus.yml) GitHub Actions
+workflow (Stylus toolchains require Linux). The pipeline runs
+`cargo stylus check`, deploys, activates the contract on-chain, and locks it
+to the registry with `setAuthorizedRegistry`. Local development:
 
 ```bash
 cd contracts/stylus
 
-# Check compilation (Linux/macOS only)
+# Check compilation (Linux/macOS)
 cargo stylus check --endpoint https://sepolia-rollup.arbitrum.io/rpc
 
-# Deploy (Linux/macOS only)
+# Deploy (CI does this on every dispatch)
 cargo stylus deploy --endpoint https://sepolia-rollup.arbitrum.io/rpc --private-key $DEPLOYER_PRIVATE_KEY
 ```
-
-> The Stylus Rust source at `contracts/stylus/src/lib.rs` mirrors the MockStylusEngine exactly. Once deployed from a Linux environment, swapping is a single `setAuthorizedRegistry` call.
 
 ---
 
@@ -353,29 +380,44 @@ The frontend uses **RainbowKit v2** for wallet connection with **Arbitrum Sepoli
 
 ---
 
-## Gas Benchmarks
+## Gas (Measured, Not Projected)
 
-Measured via `forge test --gas-report`. Full breakdown in [`GAS_BENCHMARKS.md`](./GAS_BENCHMARKS.md).
+Real transactions on Arbitrum Sepolia through the live Stylus engine:
 
-| Operation | Solidity Gas | Stylus (projected) | Savings |
-|-----------|-------------|-------------------|---------|
-| `cast_proxy_vote` | 136,531 | ~90,100 | **34%** |
-| `compile_final_results` | 7,232 | ~1,500 | **79%** |
-| Vote aggregation (compute) | ~51,000 | ~5,100 | **90%** |
+| Operation | Gas (measured) | Evidence |
+|-----------|----------------|----------|
+| `submitVote` end-to-end (registry checks + Stylus `castProxyVote`) | 479,785 | [tx](https://sepolia.arbiscan.io/tx/0x7d488c95fcb11876d8381f9ddfec8feeec6556d0f066830f9f1df7d96cd4c189) |
+| `submitVote` on the real NVDA meeting | 495,789 | on-chain |
+| Solidity reference engine `cast_proxy_vote` (unit test, engine only) | 136,531 | `forge test --gas-report` |
 
-At scale (10,000 voters, 5 proposals per meeting):
-- **Solidity-only**: ~$682 at ETH $2,500
-- **Stylus hybrid**: ~$450 — saving **$232 per meeting**
+The numbers above are *not* an apples-to-apples comparison (end-to-end
+registry path vs. engine-only unit test), and we deliberately don't publish
+projected savings. Stylus's real advantage for this design is headroom: the
+engine is where compute-heavy aggregation (quadratic weighting, multi-class
+share structures, on-chain result attestation) would live, and that work is
+dramatically cheaper in WASM than in EVM bytecode.
 
 ---
 
-## Governance Proof
+## Governance Proof — What Happens After the Vote
 
-Franchisa generates **custodian-grade cryptographic proofs** that attest a vote was:
-1. Sourced from a real SEC EDGAR filing
-2. Validated by the AI agent
-3. Executed on-chain through the voting engine
-4. Signed with ECDSA (secp256k1) by the authorized agent
+On-chain votes from tokenized stock holders are **not legally binding proxy
+votes** — and Franchisa doesn't pretend they are. What custodians of
+tokenized stocks (think Robinhood holding the underlying shares) lack today
+is a **verifiable, tamper-proof record of their token holders' voting
+intent**. That record is what they need to actually cast the underlying
+shares' proxy votes on their holders' behalf — today that channel simply
+doesn't exist, so tokenized stock holders get zero say.
+
+Franchisa's output is that record: a **custodian-grade cryptographic proof**
+attesting that every tally was:
+1. Sourced from a specific SEC EDGAR filing (keccak256 of the document is on-chain)
+2. Extracted and validated by the AI agent (7-step audit trail)
+3. Voted on by snapshot-weighted token holders through the Stylus engine
+4. Signed with ECDSA (secp256k1) — verifiable offline with one command
+
+The custodian ingests the proof, verifies the signature and the filing hash,
+and casts the real-world proxy vote to match. The chain is the audit trail.
 
 See [`PROOF_SPEC.md`](./PROOF_SPEC.md) for the full v1 specification including:
 - JSON proof schema
@@ -387,7 +429,8 @@ See [`PROOF_SPEC.md`](./PROOF_SPEC.md) for the full v1 specification including:
 
 ```bash
 cd agent
-python agent.py verify franchisa_proof_TSLA.json
+# A real proof for NVIDIA's 2026 annual meeting ships with the repo
+python agent.py verify ../frontend/public/franchisa_proof_NVDA.json
 ```
 
 This recovers the signer address from the ECDSA signature and confirms it matches the authorized agent on the registry contract.
@@ -398,7 +441,7 @@ This recovers the signer address from the ECDSA signature and confirms it matche
 
 ### Engine Auth Guard
 
-The voting engine (`MockStylusEngine` / Rust `ProxyOracle`) enforces an **`onlyRegistry` modifier** — only the `FranchisaGovernanceRegistry` contract can call `cast_proxy_vote`. This prevents vote forgery by direct calls to the engine.
+The Rust `ProxyOracle` Stylus engine enforces a **registry-only guard** — only the `FranchisaGovernanceRegistry` contract can call `castProxyVote`. This prevents vote forgery by direct calls to the engine (verified on-chain: direct calls revert).
 
 ```
 User -> Registry (validates token balance) -> Engine (records vote)
@@ -461,7 +504,7 @@ Franchisa/
     solidity/                       # Foundry project
       src/
         FranchisaGovernanceRegistry.sol   # Central governance registry
-        MockStylusEngine.sol              # Voting engine (Solidity stand-in)
+        MockStylusEngine.sol              # Solidity reference engine (tests)
         MockTokenizedStock.sol            # ERC20Votes mTSLA with faucet + auto-delegation
       test/
         FranchisaGovernanceRegistry.t.sol # 26 registry + voting + snapshot tests

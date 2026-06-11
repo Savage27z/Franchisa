@@ -11,7 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MOCK_MEETINGS } from "@/lib/mock-data";
 import { useMeetingDetail } from "@/hooks/use-meetings";
-import { CONTRACT_ADDRESSES, REGISTRY_ABI, tickerToBytes32 } from "@/lib/contracts";
+import {
+  CONTRACT_ADDRESSES,
+  REGISTRY_ABI,
+  REAL_FILING_TICKERS,
+  tickerToBytes32,
+} from "@/lib/contracts";
 
 export default function MeetingDetailPage({
   params,
@@ -68,6 +73,7 @@ export default function MeetingDetailPage({
   );
 
   const registryAddress = CONTRACT_ADDRESSES.registry;
+  const realFiling = REAL_FILING_TICKERS[meeting.ticker.toUpperCase()];
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -99,6 +105,15 @@ export default function MeetingDetailPage({
                   Live On-Chain
                 </Badge>
               )}
+              {realFiling ? (
+                <Badge className="text-[10px] rounded-full bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/10">
+                  Real SEC Filing
+                </Badge>
+              ) : (
+                <Badge className="text-[10px] rounded-full bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/10">
+                  Simulated Filing
+                </Badge>
+              )}
             </div>
             <p className="text-muted-foreground text-sm">
               {meeting.companyName}
@@ -116,14 +131,17 @@ export default function MeetingDetailPage({
                 Arbiscan
               </a>
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs text-muted-foreground cursor-pointer hover:text-foreground"
-            >
-              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-              SEC EDGAR
-            </Button>
+            {realFiling && (
+              <a
+                href={realFiling.edgarUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md hover:bg-muted dark:hover:bg-white/10"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                SEC EDGAR
+              </a>
+            )}
           </div>
         </div>
 
