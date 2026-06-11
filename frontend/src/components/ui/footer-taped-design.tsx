@@ -144,22 +144,28 @@ export function FooterTaped() {
 
         <div className="flex gap-4 items-center">
           <a
-            href="#"
-            aria-label="Website"
+            href="https://github.com/Savage27z/Franchisa#readme"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub README"
             className="text-white/30 hover:text-white transition-colors"
           >
             <Globe className="w-5 h-5" />
           </a>
           <a
-            href="#"
-            aria-label="Community"
+            href="https://sepolia.arbiscan.io/address/0x2e330aa279B69F40Ece5BC55AAC295f9c2d29f1e"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Registry on Arbiscan"
             className="text-white/30 hover:text-white transition-colors"
           >
             <MessageCircle className="w-5 h-5" />
           </a>
           <a
-            href="#"
-            aria-label="Docs"
+            href="https://www.sec.gov/Archives/edgar/data/1045810/000104581026000036/nvda-20260512.htm"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="NVIDIA DEF 14A on SEC EDGAR"
             className="text-white/30 hover:text-white transition-colors"
           >
             <ExternalLink className="w-5 h-5" />

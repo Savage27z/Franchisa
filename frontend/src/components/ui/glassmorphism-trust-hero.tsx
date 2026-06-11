@@ -154,10 +154,10 @@ export default function HeroSection({ backgroundImage }: HeroSectionProps) {
                     </div>
                     <div>
                       <div className="text-3xl font-bold tracking-tight text-white">
-                        7,594
+                        19
                       </div>
                       <div className="text-sm text-zinc-400">
-                        Active Voters
+                        Proposals On-Chain
                       </div>
                     </div>
                   </div>
@@ -165,11 +165,11 @@ export default function HeroSection({ backgroundImage }: HeroSectionProps) {
                   {/* Progress Bar */}
                   <div className="space-y-3 mb-8">
                     <div className="flex justify-between text-sm">
-                      <span className="text-zinc-400">Governance Coverage</span>
-                      <span className="text-white font-medium">94%</span>
+                      <span className="text-zinc-400">Votes Recorded On-Chain</span>
+                      <span className="text-white font-medium">100%</span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800/50">
-                      <div className="h-full w-[94%] rounded-full bg-gradient-to-r from-white to-zinc-400" />
+                      <div className="h-full w-full rounded-full bg-gradient-to-r from-white to-zinc-400" />
                     </div>
                   </div>
 
@@ -177,23 +177,16 @@ export default function HeroSection({ backgroundImage }: HeroSectionProps) {
 
                   {/* Mini Stats Grid */}
                   <div className="grid grid-cols-3 gap-4 text-center">
-                    <StatItem value="3" label="Meetings" />
-                    <StatItem value="9" label="Proposals" />
-                    <StatItem value="100%" label="On-Chain" />
+                    <StatItem value="4" label="Meetings" />
+                    <StatItem value="4" label="Tokenized Stocks" />
+                    <StatItem value="1" label="Real SEC Filing" />
                   </div>
 
                   {/* Tag Pills */}
                   <div className="mt-8 flex flex-wrap gap-2">
                     <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-medium tracking-wide text-zinc-300">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                      </span>
-                      LIVE
-                    </div>
-                    <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-medium tracking-wide text-zinc-300">
                       <Crown className="w-3 h-3 text-yellow-500" />
-                      ARBITRUM
+                      ARBITRUM STYLUS
                     </div>
                   </div>
                 </div>
